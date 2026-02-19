@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node server/server.js"
+    "dev": "node server/server.js",
+    "start": "node server/server.js"
   }
 }
