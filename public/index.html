@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ATP Bracket Challenge</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="login-screen" id="login-screen">
+      <div class="login-card">
+        <h2>Welcome to ATP Bracket Challenge</h2>
+        <p>Enter your name and choose a tournament to start your bracket.</p>
+        <label for="login-name">Name</label>
+        <input id="login-name" type="text" placeholder="Your name" />
+        <label for="login-tournament">Tournament</label>
+        <select id="login-tournament"></select>
+        <button type="button" id="login-submit">Enter</button>
+        <small id="login-hint"></small>
+      </div>
+    </div>
+    <div class="page">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">ATP Tournament Bracket Challenge</p>
+          <h1>Pick your winners. Compete every week.</h1>
+          <p class="lede">
+            Build your bracket, climb the leaderboard. Click any match to lock in your picks round
+            by round. See the standings. Use the tabs to explore.
+          </p>
+        </div>
+        <div class="hero-card">
+          <div class="hero-card__label">Scoring</div>
+          <div class="hero-card__value" id="score-rule">R32 10 · R16 20 · QF 40 · SF 80 · F 160</div>
+          <div class="hero-card__note">Each round doubles the previous score.</div>
+        </div>
+      </header>
+
+      <section class="controls">
+        <div class="control">
+          <label for="tournament-select">Tournament</label>
+          <select id="tournament-select"></select>
+        </div>
+        <div class="control">
+          <label>Player</label>
+          <div class="user-row">
+            <span id="current-user">Guest</span>
+            <span id="admin-badge" class="admin-badge" aria-label="Pool admin">Admin</span>
+            <button type="button" class="ghost" id="logout-user">Log out</button>
+          </div>
+        </div>
+        <div class="control">
+          <label for="current-week-only">Tournaments</label>
+          <label class="checkbox-row">
+            <input id="current-week-only" type="checkbox" checked />
+            Current week only
+          </label>
+        </div>
+        <div class="control">
+          <label for="pool-select">Pool</label>
+          <select id="pool-select"></select>
+          <div class="user-row">
+            <button type="button" class="ghost" id="create-pool">Create</button>
+            <button type="button" class="ghost" id="join-pool">Join</button>
+            <button type="button" class="ghost" id="rename-pool">Rename</button>
+            <button type="button" class="ghost" id="delete-pool">Delete</button>
+          </div>
+          <small id="pool-invite"></small>
+        </div>
+        <div class="control">
+          <label>Bracket Mode</label>
+          <div class="toggle" id="mode-toggle">
+            <button type="button" data-mode="pre" class="active">Pre-tournament</button>
+            <button type="button" data-mode="live">Live</button>
+            <button type="button" data-mode="completed">Completed results</button>
+          </div>
+        </div>
+        <div class="control">
+          <label for="view-select">View</label>
+          <select id="view-select">
+            <option value="bracket" selected>Bracket</option>
+            <option value="scores">Scoring</option>
+            <option value="standings">Standings</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="meta" id="tournament-meta"></section>
+
+      <main class="content">
+        <section class="bracket" id="bracket"></section>
+        <section class="scores" id="scores"></section>
+        <section class="standings" id="standings"></section>
+        <section class="leaderboard" id="leaderboard"></section>
+      </main>
+    </div>
+
+    <footer class="footer">
+      <p>Data source: atptour.com.</p>
+    </footer>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "name": "atp-bracket-challenge",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server/server.js"
+  }
+}
