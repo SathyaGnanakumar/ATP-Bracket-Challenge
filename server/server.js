@@ -269,7 +269,190 @@ function isValidSet(a, b) {
   return false;
 }
 
+function normalizeRoundName(input) {
+  const detected = detectRoundLabel(String(input || ""));
+  return detected ? (roundAlias[detected] || detected) : "";
+}
+
+function getNodeValue(node, keys = []) {
+  if (!node || typeof node !== "object") return null;
+  for (const key of keys) {
+    if (node[key] !== undefined && node[key] !== null && String(node[key]).trim() !== "") {
+      return node[key];
+    }
+  }
+  return null;
+}
+
+function getPlayerNameFromNode(node) {
+  if (!node || typeof node !== "object") return "";
+  const direct = getNodeValue(node, [
+    "name",
+    "Name",
+    "fullName",
+    "FullName",
+    "playerName",
+    "PlayerName",
+    "displayName",
+    "DisplayName",
+    "shortName",
+    "ShortName",
+  ]);
+  if (direct) return String(direct).trim();
+
+  const first = getNodeValue(node, ["firstName", "FirstName", "givenName", "GivenName"]);
+  const last = getNodeValue(node, ["lastName", "LastName", "familyName", "FamilyName"]);
+  if (first || last) return `${String(first || "").trim()} ${String(last || "").trim()}`.trim();
+  return "";
+}
+
+function parseScorelinePairs(scoreline) {
+  const text = String(scoreline || "");
+  const matches = [...text.matchAll(/([0-7])\s*[-:]\s*([0-7])/g)];
+  if (!matches.length) return null;
+  return {
+    aSets: matches.map((m) => m[1]),
+    bSets: matches.map((m) => m[2]),
+  };
+}
+
+function extractPlayersFromMatchNode(matchNode) {
+  if (!matchNode || typeof matchNode !== "object") return [];
+  const arrayCandidates = [
+    "players",
+    "Players",
+    "competitors",
+    "Competitors",
+    "participants",
+    "Participants",
+    "teams",
+    "Teams",
+  ];
+
+  for (const key of arrayCandidates) {
+    if (!Array.isArray(matchNode[key])) continue;
+    const players = matchNode[key]
+      .map((item) => {
+        const name = typeof item === "string" ? item.trim() : getPlayerNameFromNode(item);
+        if (!name) return null;
+        return {
+          id: name,
+          name,
+          seed: String(getNodeValue(item, ["seed", "Seed"]) || "").trim(),
+          rawScores: [],
+          scores: [],
+          _winner: Boolean(
+            getNodeValue(item, ["isWinner", "IsWinner", "winner", "Winner", "won", "Won"]) === true,
+          ),
+        };
+      })
+      .filter(Boolean);
+    if (players.length >= 2) return players.slice(0, 2);
+  }
+
+  const p1Node = getNodeValue(matchNode, ["player1", "Player1", "homePlayer", "HomePlayer"]);
+  const p2Node = getNodeValue(matchNode, ["player2", "Player2", "awayPlayer", "AwayPlayer"]);
+  if (p1Node && p2Node) {
+    const p1Name = typeof p1Node === "string" ? p1Node : getPlayerNameFromNode(p1Node);
+    const p2Name = typeof p2Node === "string" ? p2Node : getPlayerNameFromNode(p2Node);
+    if (p1Name && p2Name) {
+      return [
+        { id: p1Name, name: p1Name, seed: "", rawScores: [], scores: [], _winner: false },
+        { id: p2Name, name: p2Name, seed: "", rawScores: [], scores: [], _winner: false },
+      ];
+    }
+  }
+
+  return [];
+}
+
+function parseDrawFromStructuredData(html, fallbackName = "Tournament") {
+  const nextDataMatch = html.match(/<script[^>]+id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
+  if (!nextDataMatch) return null;
+
+  let root;
+  try {
+    root = JSON.parse(nextDataMatch[1]);
+  } catch (error) {
+    return null;
+  }
+
+  const queue = [root];
+  const rounds = new Map();
+  const seen = new WeakSet();
+
+  while (queue.length) {
+    const node = queue.shift();
+    if (!node || typeof node !== "object") continue;
+    if (seen.has(node)) continue;
+    seen.add(node);
+
+    const roundName = normalizeRoundName(
+      getNodeValue(node, ["roundName", "RoundName", "round", "Round", "name", "Name"]) || "",
+    );
+    const matches = getNodeValue(node, ["matches", "Matches", "matchList", "MatchList"]);
+    if (roundName && Array.isArray(matches) && matches.length) {
+      if (!rounds.has(roundName)) rounds.set(roundName, []);
+      matches.forEach((matchNode) => {
+        const players = extractPlayersFromMatchNode(matchNode);
+        if (players.length !== 2) return;
+
+        const line = getNodeValue(matchNode, ["score", "Score", "scoreline", "ScoreLine"]);
+        const parsedLine = parseScorelinePairs(line);
+        if (parsedLine) {
+          players[0].scores = parsedLine.aSets;
+          players[1].scores = parsedLine.bSets;
+        } else {
+          normalizeScores(players);
+        }
+
+        const matchId = `${roundName}-${rounds.get(roundName).length}`;
+        let winnerId = null;
+        if (players[0]._winner) winnerId = players[0].id;
+        if (players[1]._winner) winnerId = players[1].id;
+        if (!winnerId) winnerId = computeWinner(players);
+        rounds.get(roundName).push({ id: matchId, players, winnerId });
+      });
+    }
+
+    if (Array.isArray(node)) {
+      node.forEach((item) => queue.push(item));
+    } else {
+      Object.values(node).forEach((value) => {
+        if (value && typeof value === "object") queue.push(value);
+      });
+    }
+  }
+
+  if (!rounds.size) return null;
+  const roundArray = roundOrderFrom(rounds);
+  if (!roundArray.length) return null;
+
+  const lines = extractText(html);
+  const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+  const title = titleMatch ? titleMatch[1].split("|")[0].trim() : fallbackName;
+  const meta = extractTournamentMeta(html, lines);
+
+  return {
+    tournament: {
+      name: meta.name || title,
+      location: meta.location || "",
+      dates: meta.dates || "",
+      startDate: meta.startDate || "",
+      endDate: meta.endDate || "",
+      fetchedAt: new Date().toISOString(),
+    },
+    rounds: roundArray,
+  };
+}
+
 function parseDraw(html, fallbackName = "Tournament") {
+  const structured = parseDrawFromStructuredData(html, fallbackName);
+  if (structured && structured.rounds?.length) {
+    applyKnownCorrections(structured.tournament?.name || fallbackName, structured.rounds);
+    return structured;
+  }
+
   const lines = extractText(html);
   const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
   const title = titleMatch ? titleMatch[1].split("|")[0].trim() : fallbackName;
