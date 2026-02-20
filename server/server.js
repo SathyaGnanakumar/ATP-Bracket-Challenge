@@ -1000,6 +1000,22 @@ const server = http.createServer(async (req, res) => {
     const requestedName = String(name).trim();
     if (!requestedName) return json(res, 400, { error: "Name is required" });
     const safeDeviceId = getOrCreateDeviceId(deviceId);
+    const adminUserId = store.meta?.poolAdminUserId;
+    const adminDeviceId = store.meta?.poolAdminDeviceId;
+    const adminUser = adminUserId ? store.users[adminUserId] : null;
+    const hasAdmin = Boolean(adminUser && adminDeviceId);
+
+    // If this is the designated admin device, always bind it back to the admin account.
+    if (hasAdmin && adminDeviceId === safeDeviceId) {
+      store.meta.deviceUserMap[safeDeviceId] = adminUser.id;
+      if (requestedName.toLowerCase() !== adminUser.name.toLowerCase()) {
+        writeStore(store);
+        return json(res, 403, {
+          error: `This browser is reserved for admin account "${adminUser.name}".`,
+        });
+      }
+    }
+
     const boundUserId = store.meta?.deviceUserMap?.[safeDeviceId];
     if (boundUserId && !store.users[boundUserId]) {
       delete store.meta.deviceUserMap[safeDeviceId];
@@ -1007,15 +1023,21 @@ const server = http.createServer(async (req, res) => {
     if (boundUserId && store.users[boundUserId]) {
       const boundUser = store.users[boundUserId];
       if (boundUser.name.toLowerCase() !== requestedName.toLowerCase()) {
-        return json(res, 403, {
-          error: `This browser is locked to "${boundUser.name}". Log out is allowed, but name changes are disabled.`,
-        });
+        if (!hasAdmin && isSathyaName(requestedName)) {
+          // First admin bootstrap: allow this device to switch to Sathya before admin is established.
+          delete store.meta.deviceUserMap[safeDeviceId];
+        } else {
+          return json(res, 403, {
+            error: `This browser is locked to "${boundUser.name}". Log out is allowed, but name changes are disabled.`,
+          });
+        }
       }
     }
+
     if (
       isSathyaName(requestedName)
-      && store.meta?.poolAdminDeviceId
-      && store.meta.poolAdminDeviceId !== safeDeviceId
+      && hasAdmin
+      && adminDeviceId !== safeDeviceId
     ) {
       return json(res, 403, {
         error: "The name Sathya is reserved for the pool owner account on another device.",
@@ -1039,7 +1061,13 @@ const server = http.createServer(async (req, res) => {
     } else if (!user.deviceId) {
       user.deviceId = safeDeviceId;
     }
-    store.meta.deviceUserMap[safeDeviceId] = user.id;
+    if (hasAdmin && adminDeviceId === safeDeviceId) {
+      // Ensure admin device cannot drift to a non-admin user mapping.
+      store.meta.deviceUserMap[safeDeviceId] = adminUser.id;
+      user = adminUser;
+    } else {
+      store.meta.deviceUserMap[safeDeviceId] = user.id;
+    }
     if (isSathyaUser(user)) {
       if (!store.meta.poolAdminUserId) store.meta.poolAdminUserId = user.id;
       if (!store.meta.poolAdminDeviceId) store.meta.poolAdminDeviceId = user.deviceId;
