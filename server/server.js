@@ -316,6 +316,78 @@ function parseScorelinePairs(scoreline) {
   };
 }
 
+function deriveWinnerFromSetArrays(players) {
+  if (!Array.isArray(players) || players.length !== 2) return null;
+  const aSets = (players[0].scores || []).map((v) => Number(v));
+  const bSets = (players[1].scores || []).map((v) => Number(v));
+  if (!aSets.length || !bSets.length) return null;
+  let aWins = 0;
+  let bWins = 0;
+  for (let i = 0; i < Math.min(aSets.length, bSets.length); i += 1) {
+    if (!isValidSet(aSets[i], bSets[i])) return null;
+    if (aSets[i] > bSets[i]) aWins += 1;
+    if (bSets[i] > aSets[i]) bWins += 1;
+  }
+  if (aWins === bWins) return null;
+  return aWins > bWins ? players[0].id : players[1].id;
+}
+
+function extractStructuredSetScores(matchNode) {
+  if (!matchNode || typeof matchNode !== "object") return null;
+
+  const scoreline = getNodeValue(matchNode, ["score", "Score", "scoreline", "ScoreLine"]);
+  const fromLine = parseScorelinePairs(scoreline);
+  if (fromLine) return fromLine;
+
+  const setArrays = [
+    getNodeValue(matchNode, ["sets", "Sets"]),
+    getNodeValue(matchNode, ["setScores", "SetScores"]),
+    getNodeValue(matchNode, ["scoreBreakdown", "ScoreBreakdown"]),
+  ];
+
+  for (const sets of setArrays) {
+    if (!Array.isArray(sets) || !sets.length) continue;
+    const aSets = [];
+    const bSets = [];
+    for (const set of sets) {
+      const a = getNodeValue(set, ["p1", "P1", "home", "Home", "player1", "Player1", "a", "A"]);
+      const b = getNodeValue(set, ["p2", "P2", "away", "Away", "player2", "Player2", "b", "B"]);
+      if (a === null || b === null) continue;
+      const aNum = Number(a);
+      const bNum = Number(b);
+      if (!Number.isInteger(aNum) || !Number.isInteger(bNum)) continue;
+      if (!isValidSet(aNum, bNum)) continue;
+      aSets.push(String(aNum));
+      bSets.push(String(bNum));
+    }
+    if (aSets.length && bSets.length) return { aSets, bSets };
+  }
+
+  return null;
+}
+
+function getStructuredWinnerId(matchNode, players) {
+  if (!matchNode || !players?.length) return null;
+  const winnerIndex = Number(getNodeValue(matchNode, ["winnerIndex", "WinnerIndex"]));
+  if (winnerIndex === 0 || winnerIndex === 1) return players[winnerIndex]?.id || null;
+  if (winnerIndex === 1 || winnerIndex === 2) return players[winnerIndex - 1]?.id || null;
+
+  const winnerName = String(
+    getNodeValue(matchNode, ["winnerName", "WinnerName", "winner", "Winner", "winningPlayer"]),
+  ).trim();
+  if (winnerName) {
+    const normalized = winnerName.toLowerCase();
+    const direct = players.find((p) => p.name.toLowerCase() === normalized);
+    if (direct) return direct.id;
+    const fuzzy = players.find((p) => p.name.toLowerCase().includes(normalized) || normalized.includes(p.name.toLowerCase()));
+    if (fuzzy) return fuzzy.id;
+  }
+
+  if (players[0]._winner) return players[0].id;
+  if (players[1]._winner) return players[1].id;
+  return null;
+}
+
 function extractPlayersFromMatchNode(matchNode) {
   if (!matchNode || typeof matchNode !== "object") return [];
   const arrayCandidates = [
@@ -397,20 +469,15 @@ function parseDrawFromStructuredData(html, fallbackName = "Tournament") {
         const players = extractPlayersFromMatchNode(matchNode);
         if (players.length !== 2) return;
 
-        const line = getNodeValue(matchNode, ["score", "Score", "scoreline", "ScoreLine"]);
-        const parsedLine = parseScorelinePairs(line);
-        if (parsedLine) {
-          players[0].scores = parsedLine.aSets;
-          players[1].scores = parsedLine.bSets;
-        } else {
-          normalizeScores(players);
+        const parsedSets = extractStructuredSetScores(matchNode);
+        if (parsedSets) {
+          players[0].scores = parsedSets.aSets;
+          players[1].scores = parsedSets.bSets;
         }
 
         const matchId = `${roundName}-${rounds.get(roundName).length}`;
-        let winnerId = null;
-        if (players[0]._winner) winnerId = players[0].id;
-        if (players[1]._winner) winnerId = players[1].id;
-        if (!winnerId) winnerId = computeWinner(players);
+        let winnerId = getStructuredWinnerId(matchNode, players);
+        if (!winnerId && parsedSets) winnerId = deriveWinnerFromSetArrays(players);
         rounds.get(roundName).push({ id: matchId, players, winnerId });
       });
     }
@@ -470,7 +537,9 @@ function parseDraw(html, fallbackName = "Tournament") {
     }
     const roundName = currentRound;
     const matchId = `${roundName}-${rounds.get(roundName)?.length || 0}`;
-    const winnerId = computeWinner(currentMatch);
+    // Text fallback is used only when structured ATP data is unavailable.
+    // Do not infer winners/scores heuristically here; blank is safer than wrong.
+    const winnerId = null;
     const match = {
       id: matchId,
       players: currentMatch,
@@ -506,8 +575,7 @@ function parseDraw(html, fallbackName = "Tournament") {
     }
 
     if (currentPlayer && isScoreLine(line)) {
-      const tokens = extractScoreTokens(line);
-      currentPlayer.rawScores.push(...tokens);
+      continue;
     }
   }
 
