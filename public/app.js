@@ -1,12 +1,38 @@
 const fallbackTournaments = [
   {
+    id: "2026-doha-451",
+    slug: "doha",
+    eventId: "451",
+    name: "Qatar ExxonMobil Open",
+    location: "Doha, Qatar",
+    drawUrl: "https://www.atptour.com/en/scores/current/doha/451/draws",
+    currentWeek: true,
+  },
+  {
+    id: "2026-delray-beach-499",
+    slug: "delray-beach",
+    eventId: "499",
+    name: "Delray Beach Open",
+    location: "Delray Beach, United States",
+    drawUrl: "https://www.atptour.com/en/scores/current/delray-beach/499/draws",
+    currentWeek: true,
+  },
+  {
+    id: "2026-rio-de-janeiro-6932",
+    slug: "rio-de-janeiro",
+    eventId: "6932",
+    name: "Rio Open presented by Claro",
+    location: "Rio de Janeiro, Brazil",
+    drawUrl: "https://www.atptour.com/en/scores/current/rio-de-janeiro/6932/draws",
+    currentWeek: true,
+  },
+  {
     id: "2026-acapulco-807",
     slug: "acapulco",
     eventId: "807",
     name: "Abierto Mexicano Telcel presentado por HSBC",
     location: "Acapulco, Mexico",
     drawUrl: "https://www.atptour.com/en/scores/current/acapulco/807/draws",
-    currentWeek: true,
   },
   {
     id: "2026-dubai-495",
@@ -15,7 +41,6 @@ const fallbackTournaments = [
     name: "Dubai Duty Free Tennis Championships",
     location: "Dubai, United Arab Emirates",
     drawUrl: "https://www.atptour.com/en/scores/current/dubai/495/draws",
-    currentWeek: true,
   },
   {
     id: "2026-santiago-8996",
@@ -24,7 +49,6 @@ const fallbackTournaments = [
     name: "Movistar Chile Open",
     location: "Santiago, Chile",
     drawUrl: "https://www.atptour.com/en/scores/current/santiago/8996/draws",
-    currentWeek: true,
   },
   {
     id: "2026-dallas-424",
@@ -521,7 +545,10 @@ function getVisibleTournaments(includeCurrent = false) {
   if (!state.currentWeekOnly) return state.tournaments;
   const current = state.tournaments.filter((t) => state.tournamentMeta[t.id]?.isCurrentWeek);
   if (current.length) return current;
-  return includeCurrent ? state.tournaments : current;
+  const upcoming = state.tournaments.filter((t) => state.tournamentMeta[t.id]?.isUpcomingWeek);
+  if (upcoming.length) return upcoming;
+  if (includeCurrent) return state.tournaments;
+  return state.tournaments.slice(0, 6);
 }
 
 async function loadTournaments() {
@@ -567,6 +594,7 @@ function buildTournamentMeta(list) {
         isCurrentWeek:
           Boolean(tournament.currentWeek)
           || isTodayInRange(today, tournament.startDate, tournament.endDate),
+        isUpcomingWeek: isUpcomingInDays(today, tournament.startDate, 7),
       },
     ]),
   );
@@ -601,6 +629,14 @@ function isTodayInRange(today, startDate, endDate) {
   const start = new Date(startDate);
   const end = new Date(endDate);
   return today >= start && today <= end;
+}
+
+function isUpcomingInDays(today, startDate, days) {
+  if (!startDate) return false;
+  const start = new Date(startDate);
+  const dayMs = 24 * 60 * 60 * 1000;
+  const diffDays = Math.floor((start - today) / dayMs);
+  return diffDays >= 0 && diffDays <= days;
 }
 
 async function loadTournament() {
@@ -821,10 +857,14 @@ function renderPlayer(player, matchId, roundName, picked, actualWinner, lockLive
   if (!player) {
     return `<div class="player disabled"><span>TBD</span></div>`;
   }
-  const isPicked = state.mode !== "completed" && picked === player.id;
+  const pickedThisPlayer = picked === player.id;
+  const isPicked = state.mode !== "completed" && pickedThisPlayer;
   const isWinner = state.mode === "completed" && actualWinner === player.id;
   const isCorrect = state.mode === "live" && isPicked && actualWinner && actualWinner === player.id;
-  const isIncorrect = state.mode === "live" && isPicked && actualWinner && actualWinner !== player.id;
+  const isIncorrectLive = state.mode === "live" && pickedThisPlayer && actualWinner && actualWinner !== player.id;
+  const isIncorrectCompleted =
+    state.mode === "completed" && pickedThisPlayer && actualWinner && actualWinner !== player.id;
+  const isIncorrect = Boolean(isIncorrectLive || isIncorrectCompleted);
   const isDisabled = state.mode === "completed" || lockLive || state.isLocked;
   const seed = player.seed ? `<small>${player.seed}</small>` : "";
   const score =

@@ -50,6 +50,22 @@
           </div>
         </div>
         <div class="control">
+          <label>Bracket Mode</label>
+          <div class="toggle" id="mode-toggle">
+            <button type="button" data-mode="pre" class="active">Pre-tournament</button>
+            <button type="button" data-mode="live">Live</button>
+            <button type="button" data-mode="completed">Completed results</button>
+          </div>
+        </div>
+        <div class="control">
+          <label for="view-select">View</label>
+          <select id="view-select">
+            <option value="bracket" selected>Bracket</option>
+            <option value="scores">Scoring</option>
+            <option value="standings">Standings</option>
+          </select>
+        </div>
+        <div class="control">
           <label for="current-week-only">Tournaments</label>
           <label class="checkbox-row">
             <input id="current-week-only" type="checkbox" checked />
@@ -66,22 +82,6 @@
             <button type="button" class="ghost" id="delete-pool">Delete</button>
           </div>
           <small id="pool-invite"></small>
-        </div>
-        <div class="control">
-          <label>Bracket Mode</label>
-          <div class="toggle" id="mode-toggle">
-            <button type="button" data-mode="pre" class="active">Pre-tournament</button>
-            <button type="button" data-mode="live">Live</button>
-            <button type="button" data-mode="completed">Completed results</button>
-          </div>
-        </div>
-        <div class="control">
-          <label for="view-select">View</label>
-          <select id="view-select">
-            <option value="bracket" selected>Bracket</option>
-            <option value="scores">Scoring</option>
-            <option value="standings">Standings</option>
-          </select>
         </div>
       </section>
 

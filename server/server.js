@@ -16,6 +16,27 @@ const tournamentCache = {
 
 const currentFallbackTournaments = [
   {
+    slug: "doha",
+    eventId: "451",
+    name: "Qatar ExxonMobil Open",
+    location: "Doha, Qatar",
+    drawUrl: "https://www.atptour.com/en/scores/current/doha/451/draws",
+  },
+  {
+    slug: "delray-beach",
+    eventId: "499",
+    name: "Delray Beach Open",
+    location: "Delray Beach, United States",
+    drawUrl: "https://www.atptour.com/en/scores/current/delray-beach/499/draws",
+  },
+  {
+    slug: "rio-de-janeiro",
+    eventId: "6932",
+    name: "Rio Open presented by Claro",
+    location: "Rio de Janeiro, Brazil",
+    drawUrl: "https://www.atptour.com/en/scores/current/rio-de-janeiro/6932/draws",
+  },
+  {
     slug: "acapulco",
     eventId: "807",
     name: "Abierto Mexicano Telcel presentado por HSBC",
@@ -306,6 +327,36 @@ function getPlayerNameFromNode(node) {
   return "";
 }
 
+function getPlayerSeedFromNode(node) {
+  if (!node || typeof node !== "object") return "";
+  const direct = getNodeValue(node, [
+    "seed",
+    "Seed",
+    "seedNumber",
+    "SeedNumber",
+    "seedPosition",
+    "SeedPosition",
+  ]);
+  if (direct !== null && direct !== undefined && String(direct).trim() !== "") {
+    return String(direct).trim();
+  }
+  const nested = getNodeValue(node, ["player", "Player", "athlete", "Athlete"]);
+  if (nested && typeof nested === "object") {
+    const nestedSeed = getNodeValue(nested, [
+      "seed",
+      "Seed",
+      "seedNumber",
+      "SeedNumber",
+      "seedPosition",
+      "SeedPosition",
+    ]);
+    if (nestedSeed !== null && nestedSeed !== undefined && String(nestedSeed).trim() !== "") {
+      return String(nestedSeed).trim();
+    }
+  }
+  return "";
+}
+
 function parseScorelinePairs(scoreline) {
   const text = String(scoreline || "");
   const matches = [...text.matchAll(/([0-7])\s*[-:]\s*([0-7])/g)];
@@ -405,12 +456,15 @@ function extractPlayersFromMatchNode(matchNode) {
     if (!Array.isArray(matchNode[key])) continue;
     const players = matchNode[key]
       .map((item) => {
-        const name = typeof item === "string" ? item.trim() : getPlayerNameFromNode(item);
+        const playerNode = (item && typeof item === "object")
+          ? (getNodeValue(item, ["player", "Player", "athlete", "Athlete"]) || item)
+          : item;
+        const name = typeof playerNode === "string" ? playerNode.trim() : getPlayerNameFromNode(playerNode);
         if (!name) return null;
         return {
           id: name,
           name,
-          seed: String(getNodeValue(item, ["seed", "Seed"]) || "").trim(),
+          seed: getPlayerSeedFromNode(item),
           rawScores: [],
           scores: [],
           _winner: Boolean(
@@ -425,12 +479,32 @@ function extractPlayersFromMatchNode(matchNode) {
   const p1Node = getNodeValue(matchNode, ["player1", "Player1", "homePlayer", "HomePlayer"]);
   const p2Node = getNodeValue(matchNode, ["player2", "Player2", "awayPlayer", "AwayPlayer"]);
   if (p1Node && p2Node) {
-    const p1Name = typeof p1Node === "string" ? p1Node : getPlayerNameFromNode(p1Node);
-    const p2Name = typeof p2Node === "string" ? p2Node : getPlayerNameFromNode(p2Node);
+    const p1Resolved = (typeof p1Node === "object" && p1Node)
+      ? (getNodeValue(p1Node, ["player", "Player", "athlete", "Athlete"]) || p1Node)
+      : p1Node;
+    const p2Resolved = (typeof p2Node === "object" && p2Node)
+      ? (getNodeValue(p2Node, ["player", "Player", "athlete", "Athlete"]) || p2Node)
+      : p2Node;
+    const p1Name = typeof p1Resolved === "string" ? p1Resolved : getPlayerNameFromNode(p1Resolved);
+    const p2Name = typeof p2Resolved === "string" ? p2Resolved : getPlayerNameFromNode(p2Resolved);
     if (p1Name && p2Name) {
       return [
-        { id: p1Name, name: p1Name, seed: "", rawScores: [], scores: [], _winner: false },
-        { id: p2Name, name: p2Name, seed: "", rawScores: [], scores: [], _winner: false },
+        {
+          id: p1Name,
+          name: p1Name,
+          seed: getPlayerSeedFromNode(p1Node),
+          rawScores: [],
+          scores: [],
+          _winner: false,
+        },
+        {
+          id: p2Name,
+          name: p2Name,
+          seed: getPlayerSeedFromNode(p2Node),
+          rawScores: [],
+          scores: [],
+          _winner: false,
+        },
       ];
     }
   }
