@@ -16,25 +16,25 @@ const tournamentCache = {
 
 const currentFallbackTournaments = [
   {
-    slug: "doha",
-    eventId: "451",
-    name: "Qatar ExxonMobil Open",
-    location: "Doha, Qatar",
-    drawUrl: "https://www.atptour.com/en/scores/current/doha/451/draws",
+    slug: "acapulco",
+    eventId: "807",
+    name: "Abierto Mexicano Telcel presentado por HSBC",
+    location: "Acapulco, Mexico",
+    drawUrl: "https://www.atptour.com/en/scores/current/acapulco/807/draws",
   },
   {
-    slug: "delray-beach",
-    eventId: "499",
-    name: "Delray Beach Open",
-    location: "Delray Beach, United States",
-    drawUrl: "https://www.atptour.com/en/scores/current/delray-beach/499/draws",
+    slug: "dubai",
+    eventId: "495",
+    name: "Dubai Duty Free Tennis Championships",
+    location: "Dubai, United Arab Emirates",
+    drawUrl: "https://www.atptour.com/en/scores/current/dubai/495/draws",
   },
   {
-    slug: "rio-de-janeiro",
-    eventId: "6932",
-    name: "Rio Open presented by Claro",
-    location: "Rio de Janeiro, Brazil",
-    drawUrl: "https://www.atptour.com/en/scores/current/rio-de-janeiro/6932/draws",
+    slug: "santiago",
+    eventId: "8996",
+    name: "Movistar Chile Open",
+    location: "Santiago, Chile",
+    drawUrl: "https://www.atptour.com/en/scores/current/santiago/8996/draws",
   },
 ];
 
