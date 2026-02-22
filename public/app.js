@@ -1211,9 +1211,9 @@ function buildPreBracket(completedRounds) {
 }
 
 function buildLayout(rounds) {
-  const matchHeight = 94;
-  const gap = 28;
-  const topOffset = 48;
+  const matchHeight = 78;
+  const gap = 16;
+  const topOffset = 40;
   const baseMatches = rounds[0]?.matches.length || 0;
   const positions = {};
   const roundPositions = [];
