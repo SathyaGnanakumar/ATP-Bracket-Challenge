@@ -327,6 +327,14 @@ function getPlayerNameFromNode(node) {
   return "";
 }
 
+function splitNameAndSeed(rawName) {
+  const text = String(rawName || "").trim();
+  if (!text) return { name: "", seed: "" };
+  const match = text.match(/^(.*)\s+\((\d{1,2})\)$/);
+  if (!match) return { name: text, seed: "" };
+  return { name: match[1].trim(), seed: match[2].trim() };
+}
+
 function getPlayerSeedFromNode(node) {
   if (!node || typeof node !== "object") return "";
   const direct = getNodeValue(node, [
@@ -459,12 +467,16 @@ function extractPlayersFromMatchNode(matchNode) {
         const playerNode = (item && typeof item === "object")
           ? (getNodeValue(item, ["player", "Player", "athlete", "Athlete"]) || item)
           : item;
-        const name = typeof playerNode === "string" ? playerNode.trim() : getPlayerNameFromNode(playerNode);
+        const parsed = typeof playerNode === "string"
+          ? splitNameAndSeed(playerNode)
+          : splitNameAndSeed(getPlayerNameFromNode(playerNode));
+        const name = parsed.name;
         if (!name) return null;
+        const parsedSeed = parsed.seed;
         return {
           id: name,
           name,
-          seed: getPlayerSeedFromNode(item),
+          seed: getPlayerSeedFromNode(item) || parsedSeed,
           rawScores: [],
           scores: [],
           _winner: Boolean(
@@ -485,14 +497,20 @@ function extractPlayersFromMatchNode(matchNode) {
     const p2Resolved = (typeof p2Node === "object" && p2Node)
       ? (getNodeValue(p2Node, ["player", "Player", "athlete", "Athlete"]) || p2Node)
       : p2Node;
-    const p1Name = typeof p1Resolved === "string" ? p1Resolved : getPlayerNameFromNode(p1Resolved);
-    const p2Name = typeof p2Resolved === "string" ? p2Resolved : getPlayerNameFromNode(p2Resolved);
+    const p1Parsed = typeof p1Resolved === "string"
+      ? splitNameAndSeed(p1Resolved)
+      : splitNameAndSeed(getPlayerNameFromNode(p1Resolved));
+    const p2Parsed = typeof p2Resolved === "string"
+      ? splitNameAndSeed(p2Resolved)
+      : splitNameAndSeed(getPlayerNameFromNode(p2Resolved));
+    const p1Name = p1Parsed.name;
+    const p2Name = p2Parsed.name;
     if (p1Name && p2Name) {
       return [
         {
           id: p1Name,
           name: p1Name,
-          seed: getPlayerSeedFromNode(p1Node),
+          seed: getPlayerSeedFromNode(p1Node) || p1Parsed.seed,
           rawScores: [],
           scores: [],
           _winner: false,
@@ -500,7 +518,7 @@ function extractPlayersFromMatchNode(matchNode) {
         {
           id: p2Name,
           name: p2Name,
-          seed: getPlayerSeedFromNode(p2Node),
+          seed: getPlayerSeedFromNode(p2Node) || p2Parsed.seed,
           rawScores: [],
           scores: [],
           _winner: false,

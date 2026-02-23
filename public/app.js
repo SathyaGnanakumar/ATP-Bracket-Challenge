@@ -866,20 +866,20 @@ function renderPlayer(player, matchId, roundName, picked, actualWinner, lockLive
     state.mode === "completed" && pickedThisPlayer && actualWinner && actualWinner !== player.id;
   const isIncorrect = Boolean(isIncorrectLive || isIncorrectCompleted);
   const isDisabled = state.mode === "completed" || lockLive || state.isLocked;
-  const seed = player.seed ? `<small>${player.seed}</small>` : "";
   const score =
     state.mode !== "pre" && player.scores?.length
       ? `<span class="player-score">${player.scores
           .map((set) => `<span class="set-score">${set}</span>`)
           .join("")}</span>`
       : "";
+  const seedLeft = player.seed ? `<span class="seed-badge">${escapeHtml(player.seed)}</span>` : "";
   return `
     <div class="player ${isPicked ? "selected" : ""} ${isWinner ? "winner" : ""} ${
       isCorrect ? "correct" : ""
     } ${isIncorrect ? "incorrect" : ""} ${isDisabled ? "disabled" : ""}"
       data-match="${matchId}" data-player="${player.id}" data-round="${roundName}">
-      <span>${player.name}</span>
-      <span class="player-meta">${seed}${score}</span>
+      <span class="player-name">${seedLeft}<span class="player-label">${escapeHtml(player.name)}</span></span>
+      <span class="player-meta">${score}</span>
     </div>
   `;
 }

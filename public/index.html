@@ -10,7 +10,7 @@
     <div class="login-screen" id="login-screen">
       <div class="login-card">
         <h2>Welcome to ATP Bracket Challenge</h2>
-        <p>Enter your name and choose a tournament to start your bracket.</p>
+        <p>Enter your name and pick a tournament to build your bracket and compete with friends.</p>
         <label for="login-name">Name</label>
         <input id="login-name" type="text" placeholder="Your name" />
         <label for="login-tournament">Tournament</label>
@@ -36,7 +36,7 @@
         </div>
       </header>
 
-      <section class="controls">
+      <section class="controls controls-primary">
         <div class="control">
           <label for="tournament-select">Tournament</label>
           <select id="tournament-select"></select>
@@ -48,22 +48,6 @@
             <span id="admin-badge" class="admin-badge" aria-label="Pool admin">Admin</span>
             <button type="button" class="ghost" id="logout-user">Log out</button>
           </div>
-        </div>
-        <div class="control">
-          <label>Bracket Mode</label>
-          <div class="toggle" id="mode-toggle">
-            <button type="button" data-mode="pre" class="active">Pre-tournament</button>
-            <button type="button" data-mode="live">Live</button>
-            <button type="button" data-mode="completed">Completed results</button>
-          </div>
-        </div>
-        <div class="control">
-          <label for="view-select">View</label>
-          <select id="view-select">
-            <option value="bracket" selected>Bracket</option>
-            <option value="scores">Scoring</option>
-            <option value="standings">Standings</option>
-          </select>
         </div>
         <div class="control">
           <label for="current-week-only">Tournaments</label>
@@ -82,6 +66,24 @@
             <button type="button" class="ghost" id="delete-pool">Delete</button>
           </div>
           <small id="pool-invite"></small>
+        </div>
+      </section>
+      <section class="controls controls-secondary">
+        <div class="control control-mode">
+          <label>Bracket Mode</label>
+          <div class="toggle" id="mode-toggle">
+            <button type="button" data-mode="pre" class="active">Pre-tournament</button>
+            <button type="button" data-mode="live">Live</button>
+            <button type="button" data-mode="completed">Completed results</button>
+          </div>
+        </div>
+        <div class="control control-view">
+          <label for="view-select">View</label>
+          <select id="view-select">
+            <option value="bracket" selected>Bracket</option>
+            <option value="scores">Scoring</option>
+            <option value="standings">Standings</option>
+          </select>
         </div>
       </section>
 
