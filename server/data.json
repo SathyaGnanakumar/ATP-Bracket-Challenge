@@ -9,8 +9,7 @@
     "3cb5058f-81e4-4cbf-9d71-1753871ae3e1": {
       "id": "3cb5058f-81e4-4cbf-9d71-1753871ae3e1",
       "name": "Sathya",
-      "token": "d39fe9bb-cbf7-4849-a556-68340db91e8c",
-      "deviceId": "89114071-a858-41c3-842d-fad1eb1fcf52"
+      "token": "d39fe9bb-cbf7-4849-a556-68340db91e8c"
     },
     "9a578890-2ac5-4a54-b55f-caba9895d6ab": {
       "id": "9a578890-2ac5-4a54-b55f-caba9895d6ab",
@@ -51,10 +50,8 @@
   "meta": {
     "deviceUserMap": {
       "131c212e-f82f-4241-b040-8e5996364ebc": "e5fe4f83-bf88-4717-a77f-f5f2b75f4803",
-      "89114071-a858-41c3-842d-fad1eb1fcf52": "3cb5058f-81e4-4cbf-9d71-1753871ae3e1",
       "2ebb4366-a47a-44ff-a40f-257e154ea13c": "9a578890-2ac5-4a54-b55f-caba9895d6ab"
     },
-    "poolAdminUserId": "3cb5058f-81e4-4cbf-9d71-1753871ae3e1",
-    "poolAdminDeviceId": "89114071-a858-41c3-842d-fad1eb1fcf52"
+    "poolAdminUserId": "3cb5058f-81e4-4cbf-9d71-1753871ae3e1"
   }
 }
