@@ -70,6 +70,7 @@
             <button type="button" class="ghost" id="rename-pool">Rename</button>
             <button type="button" class="ghost" id="delete-pool">Delete</button>
             <button type="button" class="ghost" id="change-pin">Change PIN</button>
+          <button type="button" class="ghost" id="manage-users">Manage Users</button>
           </div>
           <small id="pool-invite"></small>
         </div>
@@ -106,6 +107,17 @@
     <footer class="footer">
       <p>Data source: atptour.com.</p>
     </footer>
+
+    <div id="admin-panel" class="admin-panel hidden" role="dialog" aria-modal="true" aria-label="Manage Users">
+      <div class="admin-panel__backdrop"></div>
+      <div class="admin-panel__inner">
+        <div class="admin-panel__header">
+          <h3>Manage Users</h3>
+          <button type="button" class="ghost" id="admin-panel-close">&times;</button>
+        </div>
+        <div id="admin-panel-body" class="admin-panel__body"></div>
+      </div>
+    </div>
 
     <script src="./app.js" type="module"></script>
   </body>

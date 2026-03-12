@@ -1447,6 +1447,93 @@ const server = http.createServer(async (req, res) => {
     });
   }
 
+  if (req.url?.startsWith("/api/admin/users") && req.method === "GET") {
+    const user = getAuthUser(req);
+    if (!user) return json(res, 401, { error: "Unauthorized" });
+    const store = readStore();
+    if (!isPoolAdminUser(store, user)) return json(res, 403, { error: "Admin only" });
+    const users = Object.values(store.users).map((u) => ({
+      id: u.id,
+      name: u.name,
+      pools: Object.entries(store.poolMembers)
+        .filter(([, members]) => Array.isArray(members) && members.includes(u.id))
+        .map(([poolId]) => ({ id: poolId, name: store.pools[poolId]?.name || poolId })),
+    }));
+    return json(res, 200, { users });
+  }
+
+  if (req.url?.startsWith("/api/admin/users") && req.method === "PATCH") {
+    const user = getAuthUser(req);
+    if (!user) return json(res, 401, { error: "Unauthorized" });
+    const store = readStore();
+    if (!isPoolAdminUser(store, user)) return json(res, 403, { error: "Admin only" });
+    const url = new URL(req.url, "http://localhost");
+    const targetId = url.searchParams.get("id");
+    if (!targetId) return json(res, 400, { error: "Missing user id" });
+    const target = store.users[targetId];
+    if (!target) return json(res, 404, { error: "User not found" });
+    const { name } = await readJson(req);
+    const newName = String(name || "").trim();
+    if (!newName) return json(res, 400, { error: "Name is required" });
+    if (isSathyaName(newName) && target.id !== store.meta?.poolAdminUserId) {
+      return json(res, 403, { error: "Cannot rename to reserved name." });
+    }
+    const conflict = Object.values(store.users).find(
+      (u) => u.id !== targetId && u.name.toLowerCase() === newName.toLowerCase(),
+    );
+    if (conflict) return json(res, 409, { error: "Name already taken." });
+    target.name = newName;
+    writeStore(store);
+    return json(res, 200, { id: targetId, name: newName });
+  }
+
+  if (req.url?.startsWith("/api/admin/users") && req.method === "DELETE") {
+    const user = getAuthUser(req);
+    if (!user) return json(res, 401, { error: "Unauthorized" });
+    const store = readStore();
+    if (!isPoolAdminUser(store, user)) return json(res, 403, { error: "Admin only" });
+    const url = new URL(req.url, "http://localhost");
+    const targetId = url.searchParams.get("id");
+    if (!targetId) return json(res, 400, { error: "Missing user id" });
+    if (targetId === user.id) return json(res, 400, { error: "Cannot delete yourself." });
+    const target = store.users[targetId];
+    if (!target) return json(res, 404, { error: "User not found" });
+    // Remove from all pools
+    Object.keys(store.poolMembers).forEach((poolId) => {
+      store.poolMembers[poolId] = store.poolMembers[poolId].filter((id) => id !== targetId);
+    });
+    // Remove all picks
+    Object.keys(store.picks).forEach((poolId) => {
+      Object.keys(store.picks[poolId] || {}).forEach((tournamentId) => {
+        delete store.picks[poolId][tournamentId][targetId];
+      });
+    });
+    // Remove device mapping
+    if (target.deviceId) {
+      delete store.meta.deviceUserMap[target.deviceId];
+    }
+    delete store.users[targetId];
+    writeStore(store);
+    return json(res, 200, { ok: true });
+  }
+
+  if (req.url?.startsWith("/api/pools/members") && req.method === "DELETE") {
+    const user = getAuthUser(req);
+    if (!user) return json(res, 401, { error: "Unauthorized" });
+    const store = readStore();
+    if (!isPoolAdminUser(store, user)) return json(res, 403, { error: "Admin only" });
+    const url = new URL(req.url, "http://localhost");
+    const poolId = url.searchParams.get("pool");
+    const targetUserId = url.searchParams.get("user");
+    if (!poolId || !targetUserId) return json(res, 400, { error: "Missing pool or user" });
+    if (targetUserId === user.id) return json(res, 400, { error: "Cannot remove yourself from pool." });
+    const pool = store.pools[poolId];
+    if (!pool) return json(res, 404, { error: "Pool not found" });
+    store.poolMembers[poolId] = (store.poolMembers[poolId] || []).filter((id) => id !== targetUserId);
+    writeStore(store);
+    return json(res, 200, { ok: true });
+  }
+
   if (req.url?.startsWith("/api/pools") && req.method === "GET") {
     const user = getAuthUser(req);
     if (!user) return json(res, 401, { error: "Unauthorized" });

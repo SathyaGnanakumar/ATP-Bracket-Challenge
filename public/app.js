@@ -284,6 +284,9 @@ async function init() {
   dom.deletePool?.addEventListener("click", deletePool);
   document.getElementById("change-pin")?.addEventListener("click", changeAdminPin);
   document.getElementById("rename-me")?.addEventListener("click", renameMe);
+  document.getElementById("manage-users")?.addEventListener("click", openManageUsers);
+  document.getElementById("admin-panel-close")?.addEventListener("click", closeManageUsers);
+  document.querySelector(".admin-panel__backdrop")?.addEventListener("click", closeManageUsers);
   dom.logoutUser.addEventListener("click", logout);
   dom.currentWeekOnly.addEventListener("change", () => {
     state.currentWeekOnly = Boolean(dom.currentWeekOnly.checked);
@@ -425,6 +428,8 @@ function applyPoolPermissions() {
   if (dom.deletePool) dom.deletePool.style.display = canManage ? "inline-flex" : "none";
   const changePinBtn = document.getElementById("change-pin");
   if (changePinBtn) changePinBtn.style.display = canManage ? "inline-flex" : "none";
+  const manageUsersBtn = document.getElementById("manage-users");
+  if (manageUsersBtn) manageUsersBtn.style.display = canManage ? "inline-flex" : "none";
   if (dom.adminBadge) dom.adminBadge.classList.toggle("visible", canManage);
 }
 
@@ -520,6 +525,119 @@ async function changeAdminPin() {
     return;
   }
   window.alert("Admin PIN updated successfully.");
+}
+
+async function openManageUsers() {
+  if (!state.session || !canManagePools()) return;
+  const panel = document.getElementById("admin-panel");
+  const body = document.getElementById("admin-panel-body");
+  if (!panel || !body) return;
+  body.innerHTML = "<p style='color:var(--muted);font-size:0.9rem'>Loading…</p>";
+  panel.classList.remove("hidden");
+
+  const data = await apiFetch("/api/admin/users", { method: "GET" });
+  if (!data?.users) {
+    body.innerHTML = "<p style='color:var(--danger)'>Failed to load users.</p>";
+    return;
+  }
+  renderAdminUsers(data.users);
+}
+
+function closeManageUsers() {
+  document.getElementById("admin-panel")?.classList.add("hidden");
+}
+
+function renderAdminUsers(users) {
+  const body = document.getElementById("admin-panel-body");
+  if (!body) return;
+  if (!users.length) {
+    body.innerHTML = "<p style='color:var(--muted);font-size:0.9rem'>No users found.</p>";
+    return;
+  }
+
+  const rows = users.map((u) => {
+    const isSelf = u.id === state.session?.id;
+    const poolNames = u.pools.map((p) => escapeHtml(p.name)).join(", ") || "No pools";
+    const selfClass = isSelf ? " admin-user-row--self" : "";
+    const removeFromPoolButtons = u.pools.map((p) =>
+      `<button type="button" class="ghost" data-action="remove-from-pool" data-user-id="${escapeHtml(u.id)}" data-pool-id="${escapeHtml(p.id)}" data-user-name="${escapeHtml(u.name)}" data-pool-name="${escapeHtml(p.name)}">Remove from ${escapeHtml(p.name)}</button>`
+    ).join("");
+    const renameBtn = `<button type="button" class="ghost" data-action="rename-user" data-user-id="${escapeHtml(u.id)}" data-user-name="${escapeHtml(u.name)}">Rename</button>`;
+    const deleteBtn = isSelf ? "" : `<button type="button" class="ghost danger" data-action="delete-user" data-user-id="${escapeHtml(u.id)}" data-user-name="${escapeHtml(u.name)}">Delete</button>`;
+
+    return `<div class="admin-user-row${selfClass}">
+      <div class="admin-user-row__info">
+        <div class="admin-user-row__name">${escapeHtml(u.name)}</div>
+        <div class="admin-user-row__pools">${poolNames}</div>
+      </div>
+      <div class="admin-user-row__actions">
+        ${renameBtn}
+        ${removeFromPoolButtons}
+        ${deleteBtn}
+      </div>
+    </div>`;
+  }).join("");
+
+  body.innerHTML = `<div class="admin-user-list">${rows}</div>`;
+
+  body.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const userId = btn.dataset.userId;
+    const userName = btn.dataset.userName;
+    const poolId = btn.dataset.poolId;
+    const poolName = btn.dataset.poolName;
+
+    if (action === "rename-user") {
+      const newName = window.prompt(`Rename "${userName}" to:`, userName);
+      if (!newName || newName.trim() === userName) return;
+      const res = await fetch(`/api/admin/users?id=${encodeURIComponent(userId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${state.session.token}` },
+        body: JSON.stringify({ name: newName.trim() }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        window.alert(d.error || "Could not rename user.");
+        return;
+      }
+      await refreshAdminUsers();
+    }
+
+    if (action === "remove-from-pool") {
+      if (!window.confirm(`Remove "${userName}" from pool "${poolName}"?`)) return;
+      const res = await fetch(`/api/pools/members?pool=${encodeURIComponent(poolId)}&user=${encodeURIComponent(userId)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${state.session.token}` },
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        window.alert(d.error || "Could not remove user from pool.");
+        return;
+      }
+      await refreshAdminUsers();
+    }
+
+    if (action === "delete-user") {
+      if (!window.confirm(`Delete user "${userName}"? This will permanently remove their account and all their picks.`)) return;
+      const res = await fetch(`/api/admin/users?id=${encodeURIComponent(userId)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${state.session.token}` },
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        window.alert(d.error || "Could not delete user.");
+        return;
+      }
+      await refreshAdminUsers();
+    }
+  });
+}
+
+async function refreshAdminUsers() {
+  const data = await apiFetch("/api/admin/users", { method: "GET" });
+  if (data?.users) renderAdminUsers(data.users);
 }
 
 async function renameMe() {
