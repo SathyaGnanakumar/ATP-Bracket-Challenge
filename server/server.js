@@ -1337,7 +1337,7 @@ function serveStatic(req, res) {
 
 const server = http.createServer(async (req, res) => {
   if (req.url?.startsWith("/api/login") && req.method === "POST") {
-    const { name, deviceId } = await readJson(req);
+    const { name, deviceId, pin } = await readJson(req);
     if (!name) return json(res, 400, { error: "Name is required" });
     const store = readStore();
     const requestedName = String(name).trim();
@@ -1352,13 +1352,10 @@ const server = http.createServer(async (req, res) => {
     if (boundUserId && store.users[boundUserId]) {
       const boundUser = store.users[boundUserId];
       if (boundUser.name.toLowerCase() !== requestedName.toLowerCase()) {
-        if (!adminUserId && isSathyaName(requestedName)) {
-          // First admin bootstrap: allow this device to switch to Sathya before admin is established.
-          delete store.meta.deviceUserMap[safeDeviceId];
-        } else {
-          return json(res, 403, {
-            error: `This browser is locked to "${boundUser.name}". Log out is allowed, but name changes are disabled.`,
-          });
+        // Allow name changes — unbind the old device mapping so a new user record is created/found.
+        delete store.meta.deviceUserMap[safeDeviceId];
+        if (boundUser.deviceId === safeDeviceId) {
+          delete boundUser.deviceId;
         }
       }
     }
@@ -1371,7 +1368,13 @@ const server = http.createServer(async (req, res) => {
     }
     if (user && user.deviceId && user.deviceId !== safeDeviceId) {
       if (isSathyaUser(user)) {
-        // Admin can log in from any device — update the device binding.
+        // Admin can log in from any device, but must provide the PIN if one is set.
+        const adminPin = store.meta?.adminPin;
+        if (adminPin) {
+          if (!pin || pin !== adminPin) {
+            return json(res, 403, { error: "Incorrect admin PIN." });
+          }
+        }
         user.deviceId = safeDeviceId;
       } else {
         return json(res, 403, {
@@ -1399,6 +1402,19 @@ const server = http.createServer(async (req, res) => {
       deviceId: safeDeviceId,
       canManagePools,
     });
+  }
+
+  if (req.url?.startsWith("/api/admin/pin") && req.method === "POST") {
+    const user = getAuthUser(req);
+    if (!user) return json(res, 401, { error: "Unauthorized" });
+    const store = readStore();
+    if (!isPoolAdminUser(store, user)) return json(res, 403, { error: "Admin only" });
+    const { pin } = await readJson(req);
+    const newPin = String(pin || "").trim();
+    if (!newPin || newPin.length < 4) return json(res, 400, { error: "PIN must be at least 4 characters" });
+    store.meta.adminPin = newPin;
+    writeStore(store);
+    return json(res, 200, { ok: true });
   }
 
   if (req.url?.startsWith("/api/me")) {
