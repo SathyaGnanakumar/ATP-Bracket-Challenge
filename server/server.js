@@ -1417,6 +1417,25 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { ok: true });
   }
 
+  if (req.url?.startsWith("/api/me") && req.method === "PATCH") {
+    const user = getAuthUser(req);
+    if (!user) return json(res, 401, { error: "Unauthorized" });
+    const { name } = await readJson(req);
+    const newName = String(name || "").trim();
+    if (!newName) return json(res, 400, { error: "Name is required" });
+    if (isSathyaName(newName) && !isSathyaUser(user)) {
+      return json(res, 403, { error: "That name is reserved." });
+    }
+    const store = readStore();
+    const conflict = Object.values(store.users).find(
+      (u) => u.id !== user.id && u.name.toLowerCase() === newName.toLowerCase(),
+    );
+    if (conflict) return json(res, 409, { error: "That name is already taken." });
+    store.users[user.id].name = newName;
+    writeStore(store);
+    return json(res, 200, { id: user.id, name: newName });
+  }
+
   if (req.url?.startsWith("/api/me")) {
     const user = getAuthUser(req);
     if (!user) return json(res, 401, { error: "Unauthorized" });

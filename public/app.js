@@ -283,6 +283,7 @@ async function init() {
   dom.renamePool?.addEventListener("click", renamePool);
   dom.deletePool?.addEventListener("click", deletePool);
   document.getElementById("change-pin")?.addEventListener("click", changeAdminPin);
+  document.getElementById("rename-me")?.addEventListener("click", renameMe);
   dom.logoutUser.addEventListener("click", logout);
   dom.currentWeekOnly.addEventListener("change", () => {
     state.currentWeekOnly = Boolean(dom.currentWeekOnly.checked);
@@ -519,6 +520,25 @@ async function changeAdminPin() {
     return;
   }
   window.alert("Admin PIN updated successfully.");
+}
+
+async function renameMe() {
+  if (!state.session) return;
+  const newName = window.prompt("Enter your new display name:", state.session.name);
+  if (!newName || newName.trim() === state.session.name) return;
+  const response = await fetch("/api/me", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${state.session.token}` },
+    body: JSON.stringify({ name: newName.trim() }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    window.alert(data.error || "Could not rename.");
+    return;
+  }
+  const data = await response.json();
+  state.session.name = data.name;
+  dom.currentUser.textContent = data.name;
 }
 
 function logout() {
