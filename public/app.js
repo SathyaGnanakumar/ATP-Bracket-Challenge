@@ -200,6 +200,8 @@ const dom = {
   standings: document.getElementById("standings"),
   loginScreen: document.getElementById("login-screen"),
   loginName: document.getElementById("login-name"),
+  loginPinRow: document.getElementById("login-pin-row"),
+  loginPin: document.getElementById("login-pin"),
   loginTournament: document.getElementById("login-tournament"),
   loginSubmit: document.getElementById("login-submit"),
   loginHint: document.getElementById("login-hint"),
@@ -256,7 +258,15 @@ async function init() {
   });
 
   dom.loginSubmit.addEventListener("click", login);
+  dom.loginName.addEventListener("input", () => {
+    const isAdmin = dom.loginName.value.trim().toLowerCase() === "sathya";
+    dom.loginPinRow?.classList.toggle("hidden", !isAdmin);
+    if (!isAdmin && dom.loginPin) dom.loginPin.value = "";
+  });
   dom.loginName.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") login();
+  });
+  dom.loginPin?.addEventListener("keydown", (event) => {
     if (event.key === "Enter") login();
   });
   dom.loginTournament.addEventListener("keydown", (event) => {
@@ -272,6 +282,7 @@ async function init() {
   dom.joinPool?.addEventListener("click", joinPool);
   dom.renamePool?.addEventListener("click", renamePool);
   dom.deletePool?.addEventListener("click", deletePool);
+  document.getElementById("change-pin")?.addEventListener("click", changeAdminPin);
   dom.logoutUser.addEventListener("click", logout);
   dom.currentWeekOnly.addEventListener("change", () => {
     state.currentWeekOnly = Boolean(dom.currentWeekOnly.checked);
@@ -335,7 +346,7 @@ async function login() {
   const response = await fetch("/api/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, deviceId: getDeviceId() }),
+    body: JSON.stringify({ name, deviceId: getDeviceId(), pin: dom.loginPin?.value || undefined }),
   });
   if (!response.ok) {
     const text = await response.text();
@@ -411,6 +422,8 @@ function applyPoolPermissions() {
   if (dom.createPool) dom.createPool.style.display = canManage ? "inline-flex" : "none";
   if (dom.renamePool) dom.renamePool.style.display = canManage ? "inline-flex" : "none";
   if (dom.deletePool) dom.deletePool.style.display = canManage ? "inline-flex" : "none";
+  const changePinBtn = document.getElementById("change-pin");
+  if (changePinBtn) changePinBtn.style.display = canManage ? "inline-flex" : "none";
   if (dom.adminBadge) dom.adminBadge.classList.toggle("visible", canManage);
 }
 
@@ -486,6 +499,26 @@ async function deletePool() {
   }
   await loadPools();
   loadTournament();
+}
+
+async function changeAdminPin() {
+  if (!state.session || !canManagePools()) return;
+  const pin = window.prompt("Enter new admin PIN (min 4 characters):");
+  if (!pin) return;
+  if (pin.length < 4) {
+    window.alert("PIN must be at least 4 characters.");
+    return;
+  }
+  const response = await fetch("/api/admin/pin", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${state.session.token}` },
+    body: JSON.stringify({ pin }),
+  });
+  if (!response.ok) {
+    window.alert("Could not update PIN.");
+    return;
+  }
+  window.alert("Admin PIN updated successfully.");
 }
 
 function logout() {

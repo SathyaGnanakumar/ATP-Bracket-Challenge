@@ -9,13 +9,26 @@
     "3cb5058f-81e4-4cbf-9d71-1753871ae3e1": {
       "id": "3cb5058f-81e4-4cbf-9d71-1753871ae3e1",
       "name": "Sathya",
-      "token": "d39fe9bb-cbf7-4849-a556-68340db91e8c"
+      "token": "d39fe9bb-cbf7-4849-a556-68340db91e8c",
+      "deviceId": "8dedb78c-695e-46c5-b6bf-4cac2179628d"
     },
     "9a578890-2ac5-4a54-b55f-caba9895d6ab": {
       "id": "9a578890-2ac5-4a54-b55f-caba9895d6ab",
       "name": "Nathan",
       "token": "d38f8c1b-361e-45db-984c-888e13833d6d",
       "deviceId": "2ebb4366-a47a-44ff-a40f-257e154ea13c"
+    },
+    "a02ae988-d23c-45c9-ba1f-1237b1411853": {
+      "id": "a02ae988-d23c-45c9-ba1f-1237b1411853",
+      "name": "Bing",
+      "token": "7f7521f9-da40-42ed-8962-d1f4c8b563a8",
+      "deviceId": "46805d33-c179-43b6-9284-d5b39fc3aefa"
+    },
+    "4c659e20-3584-4ebb-a240-ad57739df804": {
+      "id": "4c659e20-3584-4ebb-a240-ad57739df804",
+      "name": "Donk",
+      "token": "0ff3d442-1b60-44a9-af66-acf8fdfabf0f",
+      "deviceId": "21b09b9b-1e8d-4d36-897d-6b4edbf209ed"
     }
   },
   "picks": {
@@ -44,14 +57,19 @@
   "poolMembers": {
     "3efee878-c6a2-4d1b-9026-cc7287ecefc8": [
       "3cb5058f-81e4-4cbf-9d71-1753871ae3e1",
-      "9a578890-2ac5-4a54-b55f-caba9895d6ab"
+      "9a578890-2ac5-4a54-b55f-caba9895d6ab",
+      "a02ae988-d23c-45c9-ba1f-1237b1411853"
     ]
   },
   "meta": {
     "deviceUserMap": {
       "131c212e-f82f-4241-b040-8e5996364ebc": "e5fe4f83-bf88-4717-a77f-f5f2b75f4803",
-      "2ebb4366-a47a-44ff-a40f-257e154ea13c": "9a578890-2ac5-4a54-b55f-caba9895d6ab"
+      "2ebb4366-a47a-44ff-a40f-257e154ea13c": "9a578890-2ac5-4a54-b55f-caba9895d6ab",
+      "8dedb78c-695e-46c5-b6bf-4cac2179628d": "3cb5058f-81e4-4cbf-9d71-1753871ae3e1",
+      "46805d33-c179-43b6-9284-d5b39fc3aefa": "a02ae988-d23c-45c9-ba1f-1237b1411853",
+      "21b09b9b-1e8d-4d36-897d-6b4edbf209ed": "4c659e20-3584-4ebb-a240-ad57739df804"
     },
-    "poolAdminUserId": "3cb5058f-81e4-4cbf-9d71-1753871ae3e1"
+    "poolAdminUserId": "3cb5058f-81e4-4cbf-9d71-1753871ae3e1",
+    "adminPin": "sathya1"
   }
 }

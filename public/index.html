@@ -12,7 +12,11 @@
         <h2>Welcome to ATP Bracket Challenge</h2>
         <p>Enter your name and pick a tournament to build your bracket and compete with friends.</p>
         <label for="login-name">Name</label>
-        <input id="login-name" type="text" placeholder="Your name" />
+        <input id="login-name" type="text" placeholder="Your name" autocomplete="username" />
+        <div id="login-pin-row" class="hidden">
+          <label for="login-pin">Admin PIN</label>
+          <input id="login-pin" type="password" placeholder="Enter admin PIN" autocomplete="current-password" />
+        </div>
         <label for="login-tournament">Tournament</label>
         <select id="login-tournament"></select>
         <button type="button" id="login-submit">Enter</button>
@@ -64,6 +68,7 @@
             <button type="button" class="ghost" id="join-pool">Join</button>
             <button type="button" class="ghost" id="rename-pool">Rename</button>
             <button type="button" class="ghost" id="delete-pool">Delete</button>
+            <button type="button" class="ghost" id="change-pin">Change PIN</button>
           </div>
           <small id="pool-invite"></small>
         </div>
