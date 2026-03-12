@@ -309,6 +309,39 @@ h1 {
 #pool-invite {
   color: var(--muted);
   font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+#pool-invite a {
+  color: var(--secondary);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+#pool-invite a:hover {
+  text-decoration: underline;
+}
+
+.copy-invite {
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+
+.copy-invite:hover {
+  border-color: var(--secondary);
+  color: var(--secondary);
+  background: var(--secondary-light);
 }
 
 select {
@@ -876,6 +909,11 @@ select:focus {
 .tournament-option.current {
   font-weight: 700;
   color: var(--secondary);
+}
+
+.tournament-option.upcoming {
+  font-weight: 600;
+  color: var(--primary);
 }
 
 .score-grid {

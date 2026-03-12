@@ -16,46 +16,22 @@ const tournamentCache = {
 
 const currentFallbackTournaments = [
   {
-    slug: "doha",
-    eventId: "451",
-    name: "Qatar ExxonMobil Open",
-    location: "Doha, Qatar",
-    drawUrl: "https://www.atptour.com/en/scores/current/doha/451/draws",
+    slug: "indian-wells",
+    eventId: "404",
+    name: "BNP Paribas Open",
+    location: "Indian Wells, United States",
+    startDate: "2026-03-04",
+    endDate: "2026-03-16",
+    drawUrl: "https://www.atptour.com/en/scores/current/indian-wells/404/draws",
   },
   {
-    slug: "delray-beach",
-    eventId: "499",
-    name: "Delray Beach Open",
-    location: "Delray Beach, United States",
-    drawUrl: "https://www.atptour.com/en/scores/current/delray-beach/499/draws",
-  },
-  {
-    slug: "rio-de-janeiro",
-    eventId: "6932",
-    name: "Rio Open presented by Claro",
-    location: "Rio de Janeiro, Brazil",
-    drawUrl: "https://www.atptour.com/en/scores/current/rio-de-janeiro/6932/draws",
-  },
-  {
-    slug: "acapulco",
-    eventId: "807",
-    name: "Abierto Mexicano Telcel presentado por HSBC",
-    location: "Acapulco, Mexico",
-    drawUrl: "https://www.atptour.com/en/scores/current/acapulco/807/draws",
-  },
-  {
-    slug: "dubai",
-    eventId: "495",
-    name: "Dubai Duty Free Tennis Championships",
-    location: "Dubai, United Arab Emirates",
-    drawUrl: "https://www.atptour.com/en/scores/current/dubai/495/draws",
-  },
-  {
-    slug: "santiago",
-    eventId: "8996",
-    name: "Movistar Chile Open",
-    location: "Santiago, Chile",
-    drawUrl: "https://www.atptour.com/en/scores/current/santiago/8996/draws",
+    slug: "miami",
+    eventId: "403",
+    name: "Miami Open presented by Itau",
+    location: "Miami Gardens, United States",
+    startDate: "2026-03-19",
+    endDate: "2026-03-29",
+    drawUrl: "https://www.atptour.com/en/scores/current/miami/403/draws",
   },
 ];
 
@@ -994,10 +970,12 @@ async function fetchCurrentTournaments(year = new Date().getFullYear()) {
   }
 
   if (!links.size) {
+    const today = new Date().toISOString().slice(0, 10);
     return currentFallbackTournaments.map((tournament) => ({
       id: `${year}-${tournament.slug}-${tournament.eventId}`,
       season: year,
-      currentWeek: true,
+      // Only mark as current week if the tournament is actually underway or starting within 7 days.
+      currentWeek: !tournament.startDate || tournament.startDate <= today,
       ...tournament,
     }));
   }
@@ -1101,22 +1079,45 @@ function roundOrderFrom(rounds) {
   return list;
 }
 
-async function fetchHtml(url) {
-  const response = await fetch(url);
+async function fetchHtmlWithUrl(url) {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+  });
   if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
-  return response.text();
+  return { html: await response.text(), finalUrl: response.url };
+}
+
+async function fetchHtml(url) {
+  const { html } = await fetchHtmlWithUrl(url);
+  return html;
 }
 
 async function fetchWithFallback(target) {
-  const html = await fetchHtml(target);
-  let parsed = parseDraw(html);
-  if (parsed.rounds.length > 0) return { html, parsed, url: target };
+  const currentYear = new Date().getFullYear();
+  const { html, finalUrl } = await fetchHtmlWithUrl(target);
+  // If a "current" URL redirected to a prior-year archive, the draw hasn't been published yet.
+  const redirectedToOldArchive = finalUrl !== target
+    && finalUrl.includes("/scores/archive/")
+    && !finalUrl.includes(`/${currentYear}/`);
+  let parsed = redirectedToOldArchive ? { rounds: [], tournament: {} } : parseDraw(html);
+  if (parsed.rounds.length > 0) return { html, parsed, url: finalUrl || target };
 
   const currentMatch = target.match(/\/scores\/current\/([^/]+)\/(\d+)\/draws/);
   if (!currentMatch) return { html, parsed, url: target };
 
   const slug = currentMatch[1];
   const id = currentMatch[2];
+
+  // If the current URL redirected to a prior-year archive, the 2026 draw has not been published
+  // yet. Skip all further fallbacks to avoid showing stale data from the wrong season.
+  if (redirectedToOldArchive) {
+    return { html: "", parsed: { rounds: [], tournament: {} }, url: target };
+  }
+
   const aliasSlugs = getCurrentSlugAliases(slug, id);
   for (const aliasSlug of aliasSlugs) {
     const aliasUrl = `https://www.atptour.com/en/scores/current/${aliasSlug}/${id}/draws`;

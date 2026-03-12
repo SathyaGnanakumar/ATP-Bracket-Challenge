@@ -1,12 +1,33 @@
 const fallbackTournaments = [
   {
+    id: "2026-miami-403",
+    slug: "miami",
+    eventId: "403",
+    name: "Miami Open presented by Itau",
+    location: "Miami Gardens, United States",
+    startDate: "2026-03-19",
+    endDate: "2026-03-29",
+    drawUrl: "https://www.atptour.com/en/scores/current/miami/403/draws",
+  },
+  {
+    id: "2026-indian-wells-404",
+    slug: "indian-wells",
+    eventId: "404",
+    name: "BNP Paribas Open",
+    location: "Indian Wells, United States",
+    startDate: "2026-03-04",
+    endDate: "2026-03-16",
+    drawUrl: "https://www.atptour.com/en/scores/current/indian-wells/404/draws",
+  },
+  {
     id: "2026-doha-451",
     slug: "doha",
     eventId: "451",
     name: "Qatar ExxonMobil Open",
     location: "Doha, Qatar",
+    startDate: "2026-02-17",
+    endDate: "2026-02-22",
     drawUrl: "https://www.atptour.com/en/scores/current/doha/451/draws",
-    currentWeek: true,
   },
   {
     id: "2026-delray-beach-499",
@@ -14,8 +35,9 @@ const fallbackTournaments = [
     eventId: "499",
     name: "Delray Beach Open",
     location: "Delray Beach, United States",
+    startDate: "2026-02-16",
+    endDate: "2026-02-23",
     drawUrl: "https://www.atptour.com/en/scores/current/delray-beach/499/draws",
-    currentWeek: true,
   },
   {
     id: "2026-rio-de-janeiro-6932",
@@ -23,8 +45,9 @@ const fallbackTournaments = [
     eventId: "6932",
     name: "Rio Open presented by Claro",
     location: "Rio de Janeiro, Brazil",
+    startDate: "2026-02-16",
+    endDate: "2026-02-23",
     drawUrl: "https://www.atptour.com/en/scores/current/rio-de-janeiro/6932/draws",
-    currentWeek: true,
   },
   {
     id: "2026-acapulco-807",
@@ -32,6 +55,8 @@ const fallbackTournaments = [
     eventId: "807",
     name: "Abierto Mexicano Telcel presentado por HSBC",
     location: "Acapulco, Mexico",
+    startDate: "2026-02-24",
+    endDate: "2026-03-01",
     drawUrl: "https://www.atptour.com/en/scores/current/acapulco/807/draws",
   },
   {
@@ -40,6 +65,8 @@ const fallbackTournaments = [
     eventId: "495",
     name: "Dubai Duty Free Tennis Championships",
     location: "Dubai, United Arab Emirates",
+    startDate: "2026-02-23",
+    endDate: "2026-03-01",
     drawUrl: "https://www.atptour.com/en/scores/current/dubai/495/draws",
   },
   {
@@ -48,6 +75,8 @@ const fallbackTournaments = [
     eventId: "8996",
     name: "Movistar Chile Open",
     location: "Santiago, Chile",
+    startDate: "2026-03-03",
+    endDate: "2026-03-08",
     drawUrl: "https://www.atptour.com/en/scores/current/santiago/8996/draws",
   },
   {
@@ -360,11 +389,21 @@ function refreshPoolInvite() {
   if (!dom.poolInvite) return;
   const pool = state.pools.find((item) => item.id === state.activePoolId);
   if (!pool || !pool.inviteCode || !canManagePools()) {
-    dom.poolInvite.textContent = "";
+    dom.poolInvite.innerHTML = "";
     return;
   }
   const inviteLink = `${window.location.origin}${window.location.pathname}?invite=${encodeURIComponent(pool.inviteCode)}`;
-  dom.poolInvite.textContent = `Invite link: ${inviteLink}`;
+  dom.poolInvite.innerHTML = `Invite: <a href="${escapeHtml(inviteLink)}" target="_blank">${escapeHtml(inviteLink)}</a> <button type="button" class="copy-invite" data-link="${escapeHtml(inviteLink)}">Copy</button>`;
+  dom.poolInvite.querySelector(".copy-invite")?.addEventListener("click", async (e) => {
+    const link = e.target.dataset.link;
+    try {
+      await navigator.clipboard.writeText(link);
+      e.target.textContent = "Copied!";
+      setTimeout(() => { e.target.textContent = "Copy"; }, 1500);
+    } catch {
+      e.target.textContent = "Copy";
+    }
+  });
 }
 
 function applyPoolPermissions() {
@@ -534,8 +573,9 @@ function populateTournamentOptions(selectEl, includeCurrent = false) {
     .map((t) => {
       const meta = state.tournamentMeta[t.id];
       const safeName = sanitizeUiText(t.name);
-      const label = meta?.isCurrentWeek ? `${safeName} (This Week)` : safeName;
-      const className = meta?.isCurrentWeek ? "tournament-option current" : "tournament-option";
+      const isUpcoming = meta?.isUpcomingWeek && !meta?.isCurrentWeek;
+      const label = meta?.isCurrentWeek ? `${safeName} (This Week)` : isUpcoming ? `${safeName} (Upcoming)` : safeName;
+      const className = meta?.isCurrentWeek ? "tournament-option current" : isUpcoming ? "tournament-option upcoming" : "tournament-option";
       return `<option class="${className}" value="${t.id}">${escapeHtml(label)}</option>`;
     })
     .join("");
@@ -544,9 +584,9 @@ function populateTournamentOptions(selectEl, includeCurrent = false) {
 function getVisibleTournaments(includeCurrent = false) {
   if (!state.currentWeekOnly) return state.tournaments;
   const current = state.tournaments.filter((t) => state.tournamentMeta[t.id]?.isCurrentWeek);
-  if (current.length) return current;
-  const upcoming = state.tournaments.filter((t) => state.tournamentMeta[t.id]?.isUpcomingWeek);
-  if (upcoming.length) return upcoming;
+  const upcoming = state.tournaments.filter((t) => state.tournamentMeta[t.id]?.isUpcomingWeek && !state.tournamentMeta[t.id]?.isCurrentWeek);
+  const combined = [...current, ...upcoming];
+  if (combined.length) return combined;
   if (includeCurrent) return state.tournaments;
   return state.tournaments.slice(0, 6);
 }
@@ -666,7 +706,7 @@ async function loadTournament() {
     data.tournament.location = data.tournament.location || state.tournament.location;
     data.tournament.name = data.tournament.name || state.tournament.name;
     if (!Array.isArray(data.rounds) || data.rounds.length === 0) {
-      throw new Error("No draw published yet");
+      throw new Error("Draw not yet published");
     }
     state.data = data;
 
@@ -696,7 +736,8 @@ async function loadTournament() {
     syncUrlState();
     render();
   } catch (error) {
-    dom.meta.innerHTML = `<span>Unable to load draw right now (${error.message}). Retry in a few seconds.</span>`;
+    const isNotPublished = error.message.includes("not yet published");
+    dom.meta.innerHTML = `<span>${isNotPublished ? "Draw not yet published — check back closer to the tournament start date." : `Unable to load draw (${error.message}).`}</span>`;
     dom.bracket.innerHTML = "";
     dom.scores.innerHTML = "";
     dom.standings.innerHTML = "";
@@ -859,7 +900,7 @@ function renderPlayer(player, matchId, roundName, picked, actualWinner, lockLive
   }
   const pickedThisPlayer = picked === player.id;
   const isPicked = state.mode !== "completed" && pickedThisPlayer;
-  const isWinner = state.mode === "completed" && actualWinner === player.id;
+  const isWinner = (state.mode === "completed" || state.mode === "live") && actualWinner === player.id;
   const isCorrect = state.mode === "live" && isPicked && actualWinner && actualWinner === player.id;
   const isIncorrectLive = state.mode === "live" && pickedThisPlayer && actualWinner && actualWinner !== player.id;
   const isIncorrectCompleted =
@@ -1364,12 +1405,12 @@ function normalizeRounds(rounds) {
 
 function expectedRoundNames(baseMatches) {
   const names = [];
-  if (baseMatches >= 64) names.push("Round of 128");
-  if (baseMatches >= 32) names.push("Round of 64");
-  if (baseMatches >= 16) names.push("Round of 32");
-  if (baseMatches >= 8) names.push("Round of 16");
-  if (baseMatches >= 4) names.push("Quarterfinals");
-  if (baseMatches >= 2) names.push("Semifinals");
+  if (baseMatches > 32) names.push("Round of 128");
+  if (baseMatches > 16) names.push("Round of 64");
+  if (baseMatches > 8) names.push("Round of 32");
+  if (baseMatches > 4) names.push("Round of 16");
+  if (baseMatches > 2) names.push("Quarterfinals");
+  if (baseMatches > 1) names.push("Semifinals");
   names.push("Final");
   return names;
 }
@@ -1392,6 +1433,24 @@ function getResultsMap(rounds) {
       if (winner) results[match.id] = winner;
     });
   });
+
+  // Infer winners from next round: if a player appears in round N+1,
+  // they won their round N match.
+  for (let i = 0; i < rounds.length - 1; i++) {
+    const nextRoundPlayers = new Set(
+      rounds[i + 1].matches.flatMap((m) =>
+        (m.players || []).map((p) => p?.id).filter(Boolean)
+      )
+    );
+    rounds[i].matches.forEach((match) => {
+      if (results[match.id]) return;
+      const winner = (match.players || []).find(
+        (p) => p?.id && p.id !== "Bye" && nextRoundPlayers.has(p.id)
+      );
+      if (winner) results[match.id] = winner.id;
+    });
+  }
+
   return results;
 }
 

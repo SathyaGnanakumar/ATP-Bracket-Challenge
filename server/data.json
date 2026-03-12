@@ -1,9 +1,60 @@
 {
-  "users": {},
-  "picks": {},
-  "pools": {},
-  "poolMembers": {},
+  "users": {
+    "e5fe4f83-bf88-4717-a77f-f5f2b75f4803": {
+      "id": "e5fe4f83-bf88-4717-a77f-f5f2b75f4803",
+      "name": "TestUser",
+      "token": "16e862b7-f0a7-4aa9-b1b2-0c256e4fe557",
+      "deviceId": "131c212e-f82f-4241-b040-8e5996364ebc"
+    },
+    "3cb5058f-81e4-4cbf-9d71-1753871ae3e1": {
+      "id": "3cb5058f-81e4-4cbf-9d71-1753871ae3e1",
+      "name": "Sathya",
+      "token": "d39fe9bb-cbf7-4849-a556-68340db91e8c",
+      "deviceId": "89114071-a858-41c3-842d-fad1eb1fcf52"
+    },
+    "9a578890-2ac5-4a54-b55f-caba9895d6ab": {
+      "id": "9a578890-2ac5-4a54-b55f-caba9895d6ab",
+      "name": "Nathan",
+      "token": "d38f8c1b-361e-45db-984c-888e13833d6d",
+      "deviceId": "2ebb4366-a47a-44ff-a40f-257e154ea13c"
+    }
+  },
+  "picks": {
+    "3efee878-c6a2-4d1b-9026-cc7287ecefc8": {
+      "2026-acapulco-807": {
+        "3cb5058f-81e4-4cbf-9d71-1753871ae3e1": {
+          "picks": {
+            "Round of 32": {
+              "Round of 32-0": "A. Zverev"
+            }
+          },
+          "updatedAt": "2026-03-12T15:44:39.830Z"
+        }
+      }
+    }
+  },
+  "pools": {
+    "3efee878-c6a2-4d1b-9026-cc7287ecefc8": {
+      "id": "3efee878-c6a2-4d1b-9026-cc7287ecefc8",
+      "name": "Sathya's Pool",
+      "ownerUserId": "3cb5058f-81e4-4cbf-9d71-1753871ae3e1",
+      "inviteCode": "261339c0",
+      "createdAt": "2026-03-12T15:44:31.989Z"
+    }
+  },
+  "poolMembers": {
+    "3efee878-c6a2-4d1b-9026-cc7287ecefc8": [
+      "3cb5058f-81e4-4cbf-9d71-1753871ae3e1",
+      "9a578890-2ac5-4a54-b55f-caba9895d6ab"
+    ]
+  },
   "meta": {
-    "deviceUserMap": {}
+    "deviceUserMap": {
+      "131c212e-f82f-4241-b040-8e5996364ebc": "e5fe4f83-bf88-4717-a77f-f5f2b75f4803",
+      "89114071-a858-41c3-842d-fad1eb1fcf52": "3cb5058f-81e4-4cbf-9d71-1753871ae3e1",
+      "2ebb4366-a47a-44ff-a40f-257e154ea13c": "9a578890-2ac5-4a54-b55f-caba9895d6ab"
+    },
+    "poolAdminUserId": "3cb5058f-81e4-4cbf-9d71-1753871ae3e1",
+    "poolAdminDeviceId": "89114071-a858-41c3-842d-fad1eb1fcf52"
   }
 }
