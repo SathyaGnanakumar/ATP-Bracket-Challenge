@@ -1622,6 +1622,24 @@ function getResultsMap(rounds) {
     });
   }
 
+  // For the Final (no next round to infer from), derive winner from set scores.
+  for (const round of rounds) {
+    for (const match of round.matches) {
+      if (results[match.id]) continue;
+      const [p1, p2] = match.players || [];
+      if (!p1?.id || !p2?.id) continue;
+      const s1 = (p1.scores || []).map(Number);
+      const s2 = (p2.scores || []).map(Number);
+      if (!s1.length || !s2.length) continue;
+      let w1 = 0, w2 = 0;
+      for (let i = 0; i < Math.min(s1.length, s2.length); i++) {
+        if (s1[i] > s2[i]) w1++;
+        else if (s2[i] > s1[i]) w2++;
+      }
+      if (w1 !== w2) results[match.id] = w1 > w2 ? p1.id : p2.id;
+    }
+  }
+
   return results;
 }
 
