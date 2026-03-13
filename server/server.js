@@ -1114,6 +1114,156 @@ function roundOrderFrom(rounds) {
   return list;
 }
 
+// Extract champion name from Wikipedia wikitext content.
+function extractChampFromWikitext(content) {
+  // Match champ= / champs= / champms= field in infoboxes
+  const patterns = [
+    /\|\s*champ\b\s*=([^\n]+)/i,
+    /\|\s*champs\s*=([^\n]+)/i,
+    /\|\s*champms\s*=([^\n]+)/i,
+  ];
+  for (const pat of patterns) {
+    const m = content.match(pat);
+    if (!m) continue;
+    // Extract display name from [[Article|Display]] or [[Name]]
+    const link = m[1].match(/\[\[(?:[^\]|]+\|)?([^\]|]+)\]\]/);
+    if (link) return link[1].trim();
+  }
+  return null;
+}
+
+// Fetch the men's singles champion for a tournament from Wikipedia.
+// Returns the champion's display name (e.g. "Ben Shelton") or null.
+async function fetchChampionFromWikipedia(year, tournamentName) {
+  if (!year) return null;
+  const wikiHeaders = { "User-Agent": "ATP-Bracket-Challenge/1.0 (nodejs)" };
+
+  // Build candidate titles to try:
+  // 1. The exact tournament name if it looks valid.
+  // 2. A human-readable version of the slug.
+  const candidates = [];
+  if (tournamentName && !/\{\{|0\s*\|\||\bfunction\b/.test(tournamentName)) {
+    candidates.push(`${year} ${tournamentName}`);
+  }
+
+  async function fetchWikipediaChamp(title) {
+    const apiUrl =
+      `https://en.wikipedia.org/w/api.php?action=query` +
+      `&titles=${encodeURIComponent(title)}` +
+      `&prop=revisions&rvprop=content&rvslots=main&rvlimit=1&format=json`;
+    try {
+      const resp = await fetch(apiUrl, { headers: wikiHeaders });
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      const pages = data.query && data.query.pages;
+      if (!pages) return null;
+      const page = Object.values(pages)[0];
+      if (!page || page.missing !== undefined) return null;
+      const content =
+        (page.revisions &&
+          page.revisions[0] &&
+          page.revisions[0].slots &&
+          page.revisions[0].slots.main &&
+          page.revisions[0].slots.main["*"]) || "";
+      return extractChampFromWikitext(content);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  for (const title of candidates) {
+    const champ = await fetchWikipediaChamp(title);
+    if (champ) return champ;
+  }
+  return null;
+}
+
+// Given a tournament slug (e.g. "dallas", "abn-amro") and year, resolve
+// the Wikipedia article title using opensearch, then return the champion name.
+async function fetchChampionFromWikipediaBySlug(year, slug) {
+  if (!year || !slug) return null;
+  const wikiHeaders = { "User-Agent": "ATP-Bracket-Challenge/1.0 (nodejs)" };
+  // Convert slug to human-readable form: "abn-amro" → "ABN AMRO", "dallas" → "Dallas Open"
+  const humanSlug = slug
+    .split("-")
+    .map((w) => w.length <= 3 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+  // Try several search queries: with "Open" suffix, without, etc.
+  const searchQueries = [
+    `${year} ${humanSlug} Open`,
+    `${year} ${humanSlug}`,
+  ];
+
+  async function fetchWikipediaContent(title) {
+    const apiUrl =
+      `https://en.wikipedia.org/w/api.php?action=query` +
+      `&titles=${encodeURIComponent(title)}` +
+      `&prop=revisions&rvprop=content&rvslots=main&rvlimit=1&format=json`;
+    const resp = await fetch(apiUrl, { headers: wikiHeaders });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const pages = data.query && data.query.pages;
+    if (!pages) return null;
+    const page = Object.values(pages)[0];
+    if (!page || page.missing !== undefined) return null;
+    return (page.revisions &&
+      page.revisions[0] &&
+      page.revisions[0].slots &&
+      page.revisions[0].slots.main &&
+      page.revisions[0].slots.main["*"]) || "";
+  }
+
+  try {
+    for (const searchQuery of searchQueries) {
+      // Use opensearch to find the closest article titles.
+      const searchUrl =
+        `https://en.wikipedia.org/w/api.php?action=opensearch` +
+        `&search=${encodeURIComponent(searchQuery)}` +
+        `&limit=5&format=json`;
+      const resp = await fetch(searchUrl, { headers: wikiHeaders });
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      // data[1] is an array of matching article titles.
+      const titles = (Array.isArray(data) && Array.isArray(data[1])) ? data[1] : [];
+      for (const title of titles) {
+        // Only use titles that include the right year.
+        if (!title.includes(String(year))) continue;
+        const content = await fetchWikipediaContent(title);
+        if (!content) continue;
+        const champ = extractChampFromWikitext(content);
+        if (champ) return champ;
+      }
+    }
+  } catch (_) {
+    // ignore
+  }
+  return null;
+}
+
+// Given a champion's full name (e.g. "Ben Shelton"), find a matching player
+// ID in the draw data by comparing last names (case-insensitive).
+function findChampionPlayerId(championName, rounds) {
+  if (!championName || !rounds) return null;
+  const parts = championName.trim().split(/\s+/);
+  // Last name is the last token; handle hyphenated names
+  const lastName = parts[parts.length - 1].toLowerCase();
+  const seen = new Set();
+  for (const round of rounds) {
+    for (const match of round.matches) {
+      for (const player of match.players || []) {
+        const id = player.id;
+        if (!id || id === "TBD" || id === "Bye" || seen.has(id)) continue;
+        seen.add(id);
+        // Match "B. Shelton" → last token "shelton", or "Ben Shelton" → "shelton"
+        const idLower = id.toLowerCase();
+        const tokens = idLower.split(/[\s.]+/).filter(Boolean);
+        if (tokens[tokens.length - 1] === lastName) return id;
+      }
+    }
+  }
+  return null;
+}
+
 async function fetchHtmlWithUrl(url) {
   const response = await fetch(url, {
     headers: {
@@ -1757,10 +1907,11 @@ const server = http.createServer(async (req, res) => {
     try {
       const { parsed, url: sourceUrl } = await fetchWithFallback(target);
       parsed.tournament.sourceUrl = sourceUrl;
-      // Apply any admin-recorded final results that the ATP Tour page didn't provide.
+
+      // Apply any cached/admin-recorded final results that the ATP Tour page didn't provide.
+      const store = readStore();
       if (tournamentId) {
-        const store = readStore();
-        const overrides = store.meta?.finalResults?.[tournamentId] || {};
+        const overrides = (store.meta && store.meta.finalResults && store.meta.finalResults[tournamentId]) || {};
         for (const round of parsed.rounds) {
           for (const match of round.matches) {
             if (overrides[match.id] && !match.winnerId) {
@@ -1769,6 +1920,77 @@ const server = http.createServer(async (req, res) => {
           }
         }
       }
+
+      // Auto-detect the Final winner from Wikipedia when it is missing.
+      if (tournamentId && parsed.rounds.length > 0) {
+        const lastRound = parsed.rounds[parsed.rounds.length - 1];
+        const isFinalRound = /^finals?$/i.test(lastRound.name);
+        const isSemiRound = /semi/i.test(lastRound.name);
+        // Case 1: Final round exists but winner is unknown.
+        // Case 2: Final round is absent (last round is Semifinals) — create it.
+        const finalMatch = isFinalRound ? lastRound.matches[0] : null;
+        const needsWinner = (finalMatch && !finalMatch.winnerId) || isSemiRound;
+        if (needsWinner) {
+          const cachedMatchId = isFinalRound ? (finalMatch && finalMatch.id) : "Final-0";
+          const cached = store.meta && store.meta.finalResults &&
+            store.meta.finalResults[tournamentId] &&
+            store.meta.finalResults[tournamentId][cachedMatchId];
+          if (cached) {
+            // Apply cached winner — create synthetic Final if needed.
+            if (isSemiRound) {
+              const champId = cached;
+              parsed.rounds.push({
+                name: "Final",
+                matches: [{
+                  id: "Final-0",
+                  players: [
+                    { id: champId, name: champId, seed: "", rawScores: [], scores: [] },
+                    { id: "TBD", name: "TBD", seed: "", rawScores: [], scores: [] },
+                  ],
+                  winnerId: champId,
+                }],
+              });
+            }
+          } else {
+            const yearMatch = tournamentId.match(/^(\d{4})-(.+)-\d+$/);
+            const year = yearMatch && yearMatch[1];
+            const slug = yearMatch && yearMatch[2];
+            const name = parsed.tournament.name;
+            if (year) {
+              const champion =
+                await fetchChampionFromWikipedia(year, name) ||
+                await fetchChampionFromWikipediaBySlug(year, slug);
+              if (champion) {
+                const playerId = findChampionPlayerId(champion, parsed.rounds);
+                if (playerId) {
+                  if (finalMatch) {
+                    finalMatch.winnerId = playerId;
+                  } else {
+                    // Add synthetic Final round.
+                    parsed.rounds.push({
+                      name: "Final",
+                      matches: [{
+                        id: "Final-0",
+                        players: [
+                          { id: playerId, name: playerId, seed: "", rawScores: [], scores: [] },
+                          { id: "TBD", name: "TBD", seed: "", rawScores: [], scores: [] },
+                        ],
+                        winnerId: playerId,
+                      }],
+                    });
+                  }
+                  // Cache so we don't hit Wikipedia on every request.
+                  store.meta.finalResults = store.meta.finalResults || {};
+                  store.meta.finalResults[tournamentId] = store.meta.finalResults[tournamentId] || {};
+                  store.meta.finalResults[tournamentId]["Final-0"] = playerId;
+                  writeStore(store);
+                }
+              }
+            }
+          }
+        }
+      }
+
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(parsed));
     } catch (error) {
