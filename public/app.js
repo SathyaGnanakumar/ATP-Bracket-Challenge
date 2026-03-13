@@ -869,7 +869,7 @@ async function loadTournament() {
 
   try {
     const response = await fetchWithTimeout(
-      `/api/draw?url=${encodeURIComponent(state.tournament.drawUrl)}`,
+      `/api/draw?url=${encodeURIComponent(state.tournament.drawUrl)}&tournamentId=${encodeURIComponent(state.tournament.id)}`,
       15000,
     );
     if (!response.ok) throw new Error(`Draw fetch failed (${response.status})`);
@@ -1019,6 +1019,19 @@ function render() {
     });
   });
 
+  dom.bracket.querySelectorAll(".set-winner-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const matchId = btn.dataset.match;
+      const playerId = btn.dataset.player;
+      if (!confirm(`Set ${playerId} as the tournament champion?`)) return;
+      await apiFetch("/api/admin/final-result", {
+        method: "POST",
+        body: JSON.stringify({ tournamentId: state.tournament.id, matchId, winnerId: playerId }),
+      });
+      loadTournament();
+    });
+  });
+
   if (showStandings) {
     bindStandingsEvents(completedRounds);
   }
@@ -1046,6 +1059,16 @@ function renderMatch(match, roundName, roundIndex, rounds, results, layout) {
     : resolveCompletedPlayers(match, roundIndex, rounds, results);
   const top = layout.positions[match.id] ?? 0;
 
+  // Admin can set the Final winner when it's missing.
+  const isFinal = roundName === "Final";
+  const canSetWinner = isFinal && !actualWinner && state.mode === "completed"
+    && state.session?.canManagePools && players.every((p) => p && p.id && p.id !== "TBD" && p.id !== "Bye");
+  const setWinnerButtons = canSetWinner
+    ? `<div class="set-winner-row">${players.map((p) =>
+        `<button class="set-winner-btn" data-match="${match.id}" data-player="${escapeHtml(p.id)}">${escapeHtml(p.name)}</button>`
+      ).join(" <span>or</span> ")}</div>`
+    : "";
+
   return `
     <div class="match" style="top: ${top}px;">
       ${players
@@ -1061,6 +1084,7 @@ function renderMatch(match, roundName, roundIndex, rounds, results, layout) {
         )
         .join("")}
       ${renderScoreline(players)}
+      ${setWinnerButtons}
     </div>
   `;
 }

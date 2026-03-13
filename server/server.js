@@ -1731,9 +1731,23 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if (req.url?.startsWith("/api/admin/final-result") && req.method === "POST") {
+    const user = getAuthUser(req);
+    const store = readStore();
+    if (!isPoolAdminUser(store, user)) return json(res, 403, { error: "Forbidden" });
+    const { tournamentId, matchId, winnerId } = await readJson(req);
+    if (!tournamentId || !matchId || !winnerId) return json(res, 400, { error: "Missing fields" });
+    store.meta.finalResults = store.meta.finalResults || {};
+    store.meta.finalResults[tournamentId] = store.meta.finalResults[tournamentId] || {};
+    store.meta.finalResults[tournamentId][matchId] = winnerId;
+    writeStore(store);
+    return json(res, 200, { ok: true });
+  }
+
   if (req.url?.startsWith("/api/draw")) {
     const url = new URL(req.url, "http://localhost");
     const target = url.searchParams.get("url");
+    const tournamentId = url.searchParams.get("tournamentId");
     if (!target || !target.includes("atptour.com")) {
       res.writeHead(400);
       res.end("Invalid draw url");
@@ -1743,6 +1757,18 @@ const server = http.createServer(async (req, res) => {
     try {
       const { parsed, url: sourceUrl } = await fetchWithFallback(target);
       parsed.tournament.sourceUrl = sourceUrl;
+      // Apply any admin-recorded final results that the ATP Tour page didn't provide.
+      if (tournamentId) {
+        const store = readStore();
+        const overrides = store.meta?.finalResults?.[tournamentId] || {};
+        for (const round of parsed.rounds) {
+          for (const match of round.matches) {
+            if (overrides[match.id] && !match.winnerId) {
+              match.winnerId = overrides[match.id];
+            }
+          }
+        }
+      }
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(parsed));
     } catch (error) {

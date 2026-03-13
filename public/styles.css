@@ -604,13 +604,41 @@ select:focus {
   padding: 6px;
   display: grid;
   gap: 3px;
-  height: var(--match-height);
+  min-height: var(--match-height);
   box-shadow: var(--shadow-sm);
   position: absolute;
   left: 8px;
   right: 8px;
   z-index: 1;
   transition: box-shadow var(--transition);
+}
+
+.set-winner-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.set-winner-btn {
+  font-size: 10px;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+}
+.set-winner-btn:hover {
+  background: rgba(22, 163, 74, 0.1);
+  border-color: #15803d;
+  color: #15803d;
 }
 
 .match:hover {
