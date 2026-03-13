@@ -74,7 +74,7 @@ function extractText(html) {
   cleaned = cleaned.replace(/<[^>]+>/g, " ");
   return cleaned
     .split("\n")
-    .map((line) => line.replace(/\s+/g, " ").trim())
+    .map((line) => decodeHtmlEntities(line.replace(/\s+/g, " ").trim()))
     .filter(Boolean);
 }
 
@@ -446,8 +446,7 @@ function extractPlayersFromMatchNode(matchNode) {
         const parsed = typeof playerNode === "string"
           ? splitNameAndSeed(playerNode)
           : splitNameAndSeed(getPlayerNameFromNode(playerNode));
-        const name = parsed.name;
-        if (!name) return null;
+        const name = parsed.name || "Q";
         const parsedSeed = parsed.seed;
         return {
           id: name,
@@ -462,26 +461,27 @@ function extractPlayersFromMatchNode(matchNode) {
       })
       .filter(Boolean);
     if (players.length >= 2) return players.slice(0, 2);
+    if (players.length === 1) return [...players, { id: "Q", name: "Q", seed: "", rawScores: [], scores: [] }];
   }
 
   const p1Node = getNodeValue(matchNode, ["player1", "Player1", "homePlayer", "HomePlayer"]);
   const p2Node = getNodeValue(matchNode, ["player2", "Player2", "awayPlayer", "AwayPlayer"]);
-  if (p1Node && p2Node) {
-    const p1Resolved = (typeof p1Node === "object" && p1Node)
+  if (p1Node || p2Node) {
+    const p1Resolved = p1Node && (typeof p1Node === "object" && p1Node)
       ? (getNodeValue(p1Node, ["player", "Player", "athlete", "Athlete"]) || p1Node)
       : p1Node;
-    const p2Resolved = (typeof p2Node === "object" && p2Node)
+    const p2Resolved = p2Node && (typeof p2Node === "object" && p2Node)
       ? (getNodeValue(p2Node, ["player", "Player", "athlete", "Athlete"]) || p2Node)
       : p2Node;
-    const p1Parsed = typeof p1Resolved === "string"
+    const p1Parsed = p1Resolved ? (typeof p1Resolved === "string"
       ? splitNameAndSeed(p1Resolved)
-      : splitNameAndSeed(getPlayerNameFromNode(p1Resolved));
-    const p2Parsed = typeof p2Resolved === "string"
+      : splitNameAndSeed(getPlayerNameFromNode(p1Resolved))) : { name: "", seed: "" };
+    const p2Parsed = p2Resolved ? (typeof p2Resolved === "string"
       ? splitNameAndSeed(p2Resolved)
-      : splitNameAndSeed(getPlayerNameFromNode(p2Resolved));
-    const p1Name = p1Parsed.name;
-    const p2Name = p2Parsed.name;
-    if (p1Name && p2Name) {
+      : splitNameAndSeed(getPlayerNameFromNode(p2Resolved))) : { name: "", seed: "" };
+    const p1Name = p1Parsed.name || "Q";
+    const p2Name = p2Parsed.name || "Q";
+    if (p1Name || p2Name) {
       return [
         {
           id: p1Name,
@@ -504,6 +504,39 @@ function extractPlayersFromMatchNode(matchNode) {
   }
 
   return [];
+}
+
+function inferMissingByeMatches(roundArray) {
+  const r128 = roundArray.find((r) => r.name === "Round of 128");
+  const r64 = roundArray.find((r) => r.name === "Round of 64");
+  if (!r128 || !r64) return;
+
+  const r128PlayerIds = new Set();
+  for (const match of r128.matches) {
+    for (const player of match.players || []) {
+      if (player.id && player.id !== "Bye" && player.id !== "Q") {
+        r128PlayerIds.add(player.id);
+      }
+    }
+  }
+
+  const seen = new Set();
+  for (const match of r64.matches) {
+    for (const player of match.players || []) {
+      if (!player.id || player.id === "Bye" || player.id === "Q") continue;
+      if (r128PlayerIds.has(player.id) || seen.has(player.id)) continue;
+      seen.add(player.id);
+      const idx = r128.matches.length;
+      r128.matches.push({
+        id: `Round of 128-${idx}`,
+        players: [
+          { ...player },
+          { id: "Bye", name: "Bye", seed: "", rawScores: [], scores: [] },
+        ],
+        winnerId: player.id,
+      });
+    }
+  }
 }
 
 function parseDrawFromStructuredData(html, fallbackName = "Tournament") {
@@ -535,7 +568,7 @@ function parseDrawFromStructuredData(html, fallbackName = "Tournament") {
       if (!rounds.has(roundName)) rounds.set(roundName, []);
       matches.forEach((matchNode) => {
         const players = extractPlayersFromMatchNode(matchNode);
-        if (players.length !== 2) return;
+        if (players.length < 2) return;
 
         const parsedSets = extractStructuredSetScores(matchNode);
         if (parsedSets) {
@@ -585,6 +618,7 @@ function parseDraw(html, fallbackName = "Tournament") {
   const structured = parseDrawFromStructuredData(html, fallbackName);
   if (structured && structured.rounds?.length) {
     applyKnownCorrections(structured.tournament?.name || fallbackName, structured.rounds);
+    inferMissingByeMatches(structured.rounds);
     return structured;
   }
 
@@ -651,6 +685,7 @@ function parseDraw(html, fallbackName = "Tournament") {
 
   const roundArray = roundOrderFrom(rounds);
   applyKnownCorrections(title, roundArray);
+  inferMissingByeMatches(roundArray);
 
   return {
     tournament: {
