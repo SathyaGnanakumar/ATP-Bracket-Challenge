@@ -1,16 +1,10 @@
 {
   "users": {
-    "e5fe4f83-bf88-4717-a77f-f5f2b75f4803": {
-      "id": "e5fe4f83-bf88-4717-a77f-f5f2b75f4803",
-      "name": "TestUser",
-      "token": "16e862b7-f0a7-4aa9-b1b2-0c256e4fe557",
-      "deviceId": "131c212e-f82f-4241-b040-8e5996364ebc"
-    },
     "3cb5058f-81e4-4cbf-9d71-1753871ae3e1": {
       "id": "3cb5058f-81e4-4cbf-9d71-1753871ae3e1",
       "name": "Sathya",
       "token": "d39fe9bb-cbf7-4849-a556-68340db91e8c",
-      "deviceId": "8dedb78c-695e-46c5-b6bf-4cac2179628d"
+      "deviceId": "local-debug"
     },
     "9a578890-2ac5-4a54-b55f-caba9895d6ab": {
       "id": "9a578890-2ac5-4a54-b55f-caba9895d6ab",
@@ -18,17 +12,17 @@
       "token": "d38f8c1b-361e-45db-984c-888e13833d6d",
       "deviceId": "2ebb4366-a47a-44ff-a40f-257e154ea13c"
     },
-    "a02ae988-d23c-45c9-ba1f-1237b1411853": {
-      "id": "a02ae988-d23c-45c9-ba1f-1237b1411853",
-      "name": "Bing",
-      "token": "7f7521f9-da40-42ed-8962-d1f4c8b563a8",
-      "deviceId": "46805d33-c179-43b6-9284-d5b39fc3aefa"
-    },
     "4c659e20-3584-4ebb-a240-ad57739df804": {
       "id": "4c659e20-3584-4ebb-a240-ad57739df804",
       "name": "Donk",
       "token": "0ff3d442-1b60-44a9-af66-acf8fdfabf0f",
       "deviceId": "21b09b9b-1e8d-4d36-897d-6b4edbf209ed"
+    },
+    "9122d89d-7ec1-42a6-b57e-2fdf7b1269bf": {
+      "id": "9122d89d-7ec1-42a6-b57e-2fdf7b1269bf",
+      "name": "DK",
+      "token": "b253fccb-3842-4eef-8602-0bf34384e6e0",
+      "deviceId": "fa348d4f-11ee-458c-a094-0183ed132591"
     }
   },
   "picks": {
@@ -57,19 +51,60 @@
   "poolMembers": {
     "3efee878-c6a2-4d1b-9026-cc7287ecefc8": [
       "3cb5058f-81e4-4cbf-9d71-1753871ae3e1",
-      "9a578890-2ac5-4a54-b55f-caba9895d6ab",
-      "a02ae988-d23c-45c9-ba1f-1237b1411853"
+      "9a578890-2ac5-4a54-b55f-caba9895d6ab"
     ]
   },
   "meta": {
     "deviceUserMap": {
-      "131c212e-f82f-4241-b040-8e5996364ebc": "e5fe4f83-bf88-4717-a77f-f5f2b75f4803",
       "2ebb4366-a47a-44ff-a40f-257e154ea13c": "9a578890-2ac5-4a54-b55f-caba9895d6ab",
+      "21b09b9b-1e8d-4d36-897d-6b4edbf209ed": "4c659e20-3584-4ebb-a240-ad57739df804",
+      "local-debug": "3cb5058f-81e4-4cbf-9d71-1753871ae3e1",
       "8dedb78c-695e-46c5-b6bf-4cac2179628d": "3cb5058f-81e4-4cbf-9d71-1753871ae3e1",
-      "46805d33-c179-43b6-9284-d5b39fc3aefa": "a02ae988-d23c-45c9-ba1f-1237b1411853",
-      "21b09b9b-1e8d-4d36-897d-6b4edbf209ed": "4c659e20-3584-4ebb-a240-ad57739df804"
+      "fa348d4f-11ee-458c-a094-0183ed132591": "9122d89d-7ec1-42a6-b57e-2fdf7b1269bf",
+      "4d489026-6d3f-49a2-a1bc-71edc9615c02": "3cb5058f-81e4-4cbf-9d71-1753871ae3e1"
     },
     "poolAdminUserId": "3cb5058f-81e4-4cbf-9d71-1753871ae3e1",
-    "adminPin": "sathya1"
+    "adminPin": "sathya1",
+    "finalResults": {
+      "2026-indian-wells-404": {
+        "Final-0": "J. Sinner"
+      },
+      "2026-dallas-424": {
+        "Final-0": "B. Shelton"
+      },
+      "2026-australian-open-580": {
+        "Final-0": "C. Alcaraz"
+      },
+      "2026-brisbane-339": {
+        "Final-0": "D. Medvedev"
+      },
+      "2026-asb-classic-301": {
+        "Final-0": "J. Menšík"
+      },
+      "2026-adelaide-308": {
+        "Final-0": "T. Macháč"
+      },
+      "2026-dubai-330": {
+        "Final-0": "D. Medvedev"
+      },
+      "2026-delray-beach-505": {
+        "Final-0": "S. Korda"
+      },
+      "2026-acapulco-807": {
+        "Final-0": "F. Cobolli"
+      },
+      "2026-rotterdam-40": {
+        "Final-0": "A. de Minaur"
+      },
+      "2026-buenos-aires-314": {
+        "Final-0": "F. Cerúndolo"
+      },
+      "2026-rio-de-janeiro-316": {
+        "Final-0": "T. Martín Etcheverry"
+      },
+      "2026-doha-451": {
+        "Final-0": "C. Alcaraz"
+      }
+    }
   }
 }

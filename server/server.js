@@ -15,6 +15,7 @@ const tournamentCache = {
 };
 
 const currentFallbackTournaments = [
+  // ── Current / upcoming ──────────────────────────────────────────────────
   {
     slug: "indian-wells",
     eventId: "404",
@@ -22,7 +23,7 @@ const currentFallbackTournaments = [
     location: "Indian Wells, United States",
     startDate: "2026-03-04",
     endDate: "2026-03-16",
-    drawUrl: "https://www.atptour.com/en/scores/current/indian-wells/404/draws",
+    drawUrl: "https://www.atptour.com/en/scores/archive/indian-wells/404/2026/draws",
   },
   {
     slug: "miami",
@@ -32,6 +33,124 @@ const currentFallbackTournaments = [
     startDate: "2026-03-19",
     endDate: "2026-03-29",
     drawUrl: "https://www.atptour.com/en/scores/current/miami/403/draws",
+  },
+  // ── Completed 2026 (archive URLs so we never accidentally pull old-year data) ──
+  {
+    slug: "acapulco",
+    eventId: "807",
+    name: "Abierto Mexicano Telcel",
+    location: "Acapulco, Mexico",
+    startDate: "2026-02-23",
+    endDate: "2026-03-01",
+    drawUrl: "https://www.atptour.com/en/scores/archive/acapulco/807/2026/draws",
+  },
+  {
+    slug: "doha",
+    eventId: "451",
+    name: "Qatar ExxonMobil Open",
+    location: "Doha, Qatar",
+    startDate: "2026-02-16",
+    endDate: "2026-02-22",
+    drawUrl: "https://www.atptour.com/en/scores/archive/doha/451/2026/draws",
+  },
+  {
+    slug: "dubai",
+    eventId: "330",
+    name: "Dubai Duty Free Tennis Championships",
+    location: "Dubai, UAE",
+    startDate: "2026-02-23",
+    endDate: "2026-03-01",
+    drawUrl: "https://www.atptour.com/en/scores/archive/dubai/330/2026/draws",
+  },
+  {
+    slug: "dallas",
+    eventId: "424",
+    name: "Dallas Open",
+    location: "Dallas, United States",
+    startDate: "2026-02-09",
+    endDate: "2026-02-15",
+    drawUrl: "https://www.atptour.com/en/scores/archive/dallas/424/2026/draws",
+  },
+  {
+    slug: "rotterdam",
+    eventId: "40",
+    name: "ABN AMRO Open",
+    location: "Rotterdam, Netherlands",
+    startDate: "2026-02-09",
+    endDate: "2026-02-15",
+    drawUrl: "https://www.atptour.com/en/scores/archive/rotterdam/40/2026/draws",
+  },
+  {
+    slug: "delray-beach",
+    eventId: "505",
+    name: "Delray Beach Open",
+    location: "Delray Beach, United States",
+    startDate: "2026-02-09",
+    endDate: "2026-02-15",
+    drawUrl: "https://www.atptour.com/en/scores/archive/delray-beach/505/2026/draws",
+  },
+  {
+    slug: "buenos-aires",
+    eventId: "314",
+    name: "Argentina Open",
+    location: "Buenos Aires, Argentina",
+    startDate: "2026-02-09",
+    endDate: "2026-02-15",
+    drawUrl: "https://www.atptour.com/en/scores/archive/buenos-aires/314/2026/draws",
+  },
+  {
+    slug: "rio-de-janeiro",
+    eventId: "316",
+    name: "Rio Open",
+    location: "Rio de Janeiro, Brazil",
+    startDate: "2026-02-16",
+    endDate: "2026-02-22",
+    drawUrl: "https://www.atptour.com/en/scores/archive/rio-de-janeiro/316/2026/draws",
+  },
+  {
+    slug: "marseille",
+    eventId: "333",
+    name: "Open Sud de France",
+    location: "Montpellier, France",
+    startDate: "2026-02-02",
+    endDate: "2026-02-08",
+    drawUrl: "https://www.atptour.com/en/scores/archive/marseille/333/2026/draws",
+  },
+  {
+    slug: "australian-open",
+    eventId: "580",
+    name: "Australian Open",
+    location: "Melbourne, Australia",
+    startDate: "2026-01-19",
+    endDate: "2026-02-01",
+    drawUrl: "https://www.atptour.com/en/scores/archive/australian-open/580/2026/draws",
+  },
+  {
+    slug: "brisbane",
+    eventId: "339",
+    name: "Brisbane International",
+    location: "Brisbane, Australia",
+    startDate: "2026-01-05",
+    endDate: "2026-01-11",
+    drawUrl: "https://www.atptour.com/en/scores/archive/brisbane/339/2026/draws",
+  },
+  {
+    slug: "asb-classic",
+    eventId: "301",
+    name: "ASB Classic",
+    location: "Auckland, New Zealand",
+    startDate: "2026-01-05",
+    endDate: "2026-01-11",
+    drawUrl: "https://www.atptour.com/en/scores/archive/asb-classic/301/2026/draws",
+  },
+  {
+    slug: "adelaide",
+    eventId: "308",
+    name: "Adelaide International",
+    location: "Adelaide, Australia",
+    startDate: "2026-01-05",
+    endDate: "2026-01-11",
+    drawUrl: "https://www.atptour.com/en/scores/archive/adelaide/308/2026/draws",
   },
 ];
 
@@ -569,6 +688,9 @@ function parseDrawFromStructuredData(html, fallbackName = "Tournament") {
       matches.forEach((matchNode) => {
         const players = extractPlayersFromMatchNode(matchNode);
         if (players.length < 2) return;
+        // Filter out navigation/UI entries that get parsed as players (e.g. "Most Recent", "See all")
+        const isValidPlayer = (name) => !name || name === "Q" || /^[A-ZÀ-Ö]\.\s/.test(name);
+        if (!players.every((p) => isValidPlayer(p.id))) return;
 
         const parsedSets = extractStructuredSetScores(matchNode);
         if (parsedSets) {
@@ -614,11 +736,22 @@ function parseDrawFromStructuredData(html, fallbackName = "Tournament") {
   };
 }
 
+function removeInvalidPlayerMatches(rounds) {
+  if (!Array.isArray(rounds)) return;
+  const validPlayer = (name) => !name || name === "Q" || name === "Bye" || /^[A-ZÀ-Ö]\.\s/.test(name);
+  for (const round of rounds) {
+    round.matches = round.matches.filter((m) =>
+      Array.isArray(m.players) && m.players.every((p) => validPlayer(p.id))
+    );
+  }
+}
+
 function parseDraw(html, fallbackName = "Tournament") {
   const structured = parseDrawFromStructuredData(html, fallbackName);
   if (structured && structured.rounds?.length) {
     applyKnownCorrections(structured.tournament?.name || fallbackName, structured.rounds);
     inferMissingByeMatches(structured.rounds);
+    removeInvalidPlayerMatches(structured.rounds);
     return structured;
   }
 
@@ -686,6 +819,7 @@ function parseDraw(html, fallbackName = "Tournament") {
   const roundArray = roundOrderFrom(rounds);
   applyKnownCorrections(title, roundArray);
   inferMissingByeMatches(roundArray);
+  removeInvalidPlayerMatches(roundArray);
 
   return {
     tournament: {
@@ -1009,8 +1143,8 @@ async function fetchCurrentTournaments(year = new Date().getFullYear()) {
     return currentFallbackTournaments.map((tournament) => ({
       id: `${year}-${tournament.slug}-${tournament.eventId}`,
       season: year,
-      // Only mark as current week if the tournament is actually underway or starting within 7 days.
-      currentWeek: !tournament.startDate || tournament.startDate <= today,
+      // Only mark as current week if the tournament is actually in progress today.
+      currentWeek: Boolean(tournament.startDate && tournament.endDate && tournament.startDate <= today && tournament.endDate >= today),
       ...tournament,
     }));
   }
@@ -1035,7 +1169,7 @@ function mergeTournaments(archiveList, currentList) {
       ...tournament,
       name: tournament.name || existing.name,
       drawUrl: tournament.drawUrl || existing.drawUrl,
-      currentWeek: true,
+      currentWeek: existing.currentWeek || tournament.currentWeek || false,
     });
   });
 
@@ -1178,61 +1312,127 @@ async function fetchChampionFromWikipedia(year, tournamentName) {
   return null;
 }
 
+// Known mappings from ATP Tour slug to Wikipedia article name fragment.
+// Used when the slug doesn't match the Wikipedia article name.
+const slugToWikiName = {
+  "acapulco": "Abierto Mexicano Telcel",
+  "rotterdam": "ABN AMRO Open",
+  "doha": "Qatar ExxonMobil Open",
+  "buenos-aires": "Argentina Open",
+  "rio-de-janeiro": "Rio Open",
+  "marseille": "Open Sud de France",
+  "montpellier": "Open Sud de France",
+  "delray-beach": "Delray Beach Open",
+  "metz": "Moselle Open",
+  "st-petersburg": "St. Petersburg Open",
+  "sofia": "Sofia Open",
+  "gijon": "Gijon Open",
+  "tel-aviv": "Tel Aviv Open",
+  "astana": "Astana Open",
+  "stockholm": "Stockholm Open",
+  "antwerp": "European Open",
+  "vienna": "Vienna Open",
+  "paris": "Rolex Paris Masters",
+  "nitto": "Nitto ATP Finals",
+  "milan": "Next Gen ATP Finals",
+};
+
 // Given a tournament slug (e.g. "dallas", "abn-amro") and year, resolve
 // the Wikipedia article title using opensearch, then return the champion name.
 async function fetchChampionFromWikipediaBySlug(year, slug) {
   if (!year || !slug) return null;
   const wikiHeaders = { "User-Agent": "ATP-Bracket-Challenge/1.0 (nodejs)" };
-  // Convert slug to human-readable form: "abn-amro" → "ABN AMRO", "dallas" → "Dallas Open"
+  // Convert slug to human-readable form: "abn-amro" → "ABN AMRO", "brisbane" → "Brisbane"
   const humanSlug = slug
     .split("-")
     .map((w) => w.length <= 3 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
-  // Try several search queries: with "Open" suffix, without, etc.
-  const searchQueries = [
+  // Build search queries — put the known Wikipedia name first if available.
+  const knownName = slugToWikiName[slug];
+  const searchQueries = [];
+  if (knownName) searchQueries.push(`${year} ${knownName}`);
+  searchQueries.push(
     `${year} ${humanSlug} Open`,
+    `${year} ${humanSlug} International`,
     `${year} ${humanSlug}`,
-  ];
+  );
 
   async function fetchWikipediaContent(title) {
-    const apiUrl =
-      `https://en.wikipedia.org/w/api.php?action=query` +
-      `&titles=${encodeURIComponent(title)}` +
-      `&prop=revisions&rvprop=content&rvslots=main&rvlimit=1&format=json`;
-    const resp = await fetch(apiUrl, { headers: wikiHeaders });
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    const pages = data.query && data.query.pages;
-    if (!pages) return null;
-    const page = Object.values(pages)[0];
-    if (!page || page.missing !== undefined) return null;
-    return (page.revisions &&
-      page.revisions[0] &&
-      page.revisions[0].slots &&
-      page.revisions[0].slots.main &&
-      page.revisions[0].slots.main["*"]) || "";
+    try {
+      const apiUrl =
+        `https://en.wikipedia.org/w/api.php?action=query` +
+        `&titles=${encodeURIComponent(title)}` +
+        `&prop=revisions&rvprop=content&rvslots=main&rvlimit=1&format=json`;
+      const resp = await fetch(apiUrl, { headers: wikiHeaders });
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      const pages = data.query && data.query.pages;
+      if (!pages) return null;
+      const page = Object.values(pages)[0];
+      if (!page || page.missing !== undefined) return null;
+      return (page.revisions &&
+        page.revisions[0] &&
+        page.revisions[0].slots &&
+        page.revisions[0].slots.main &&
+        page.revisions[0].slots.main["*"]) || "";
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Check if a Wikipedia article title is a men's tennis event (not women's/doubles/mixed).
+  function isMensOrMainArticle(title) {
+    if (/women|doubles|mixed|qualifying|wheelchair/i.test(title)) return false;
+    return true;
   }
 
   try {
+    // Collect all candidate titles from opensearch, deduplicated.
+    const seen = new Set();
+    const mainArticles = [];   // no " – " sub-article separator
+    const mensArticles = [];   // men's singles sub-articles
+    const otherArticles = [];  // other sub-articles we might try as last resort
+
     for (const searchQuery of searchQueries) {
-      // Use opensearch to find the closest article titles.
       const searchUrl =
         `https://en.wikipedia.org/w/api.php?action=opensearch` +
         `&search=${encodeURIComponent(searchQuery)}` +
-        `&limit=5&format=json`;
+        `&limit=10&format=json`;
       const resp = await fetch(searchUrl, { headers: wikiHeaders });
       if (!resp.ok) continue;
       const data = await resp.json();
-      // data[1] is an array of matching article titles.
       const titles = (Array.isArray(data) && Array.isArray(data[1])) ? data[1] : [];
       for (const title of titles) {
-        // Only use titles that include the right year.
-        if (!title.includes(String(year))) continue;
-        const content = await fetchWikipediaContent(title);
-        if (!content) continue;
-        const champ = extractChampFromWikitext(content);
-        if (champ) return champ;
+        if (!title.includes(String(year)) || seen.has(title)) continue;
+        if (!isMensOrMainArticle(title)) continue; // skip women's/doubles/mixed
+        seen.add(title);
+        if (!title.includes(" \u2013 ") && !title.includes(" - ")) {
+          mainArticles.push(title);
+        } else if (/men'?s\s+singles?/i.test(title)) {
+          mensArticles.push(title);
+        } else {
+          otherArticles.push(title);
+        }
       }
+    }
+
+    // Also explicitly try men's singles sub-article titles as fallbacks.
+    const explicitMens = [
+      `${year} ${humanSlug} Open \u2013 Men's singles`,
+      `${year} ${humanSlug} International \u2013 Men's singles`,
+      `${year} ${humanSlug} \u2013 Men's singles`,
+    ];
+    for (const t of explicitMens) {
+      if (!seen.has(t)) mensArticles.push(t);
+    }
+
+    // Try in priority order: main articles → men's singles → other
+    const ordered = mainArticles.concat(mensArticles).concat(otherArticles);
+    for (const title of ordered) {
+      const content = await fetchWikipediaContent(title);
+      if (!content) continue;
+      const champ = extractChampFromWikitext(content);
+      if (champ) return champ;
     }
   } catch (_) {
     // ignore
@@ -1262,6 +1462,17 @@ function findChampionPlayerId(championName, rounds) {
     }
   }
   return null;
+}
+
+// Convert a full Wikipedia champion name to ATP draw player-ID format.
+// "Carlos Alcaraz" → "C. Alcaraz", "Ben Shelton" → "B. Shelton"
+function championNameToPlayerId(fullName) {
+  if (!fullName) return null;
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length < 2) return null;
+  const initial = parts[0].charAt(0).toUpperCase();
+  const lastName = parts.slice(1).join(" ");
+  return initial + ". " + lastName;
 }
 
 async function fetchHtmlWithUrl(url) {
@@ -1922,70 +2133,112 @@ const server = http.createServer(async (req, res) => {
       }
 
       // Auto-detect the Final winner from Wikipedia when it is missing.
-      if (tournamentId && parsed.rounds.length > 0) {
-        const lastRound = parsed.rounds[parsed.rounds.length - 1];
-        const isFinalRound = /^finals?$/i.test(lastRound.name);
-        const isSemiRound = /semi/i.test(lastRound.name);
-        // Case 1: Final round exists but winner is unknown.
-        // Case 2: Final round is absent (last round is Semifinals) — create it.
-        const finalMatch = isFinalRound ? lastRound.matches[0] : null;
-        const needsWinner = (finalMatch && !finalMatch.winnerId) || isSemiRound;
-        if (needsWinner) {
-          const cachedMatchId = isFinalRound ? (finalMatch && finalMatch.id) : "Final-0";
-          const cached = store.meta && store.meta.finalResults &&
-            store.meta.finalResults[tournamentId] &&
-            store.meta.finalResults[tournamentId][cachedMatchId];
-          if (cached) {
-            // Apply cached winner — create synthetic Final if needed.
-            if (isSemiRound) {
-              const champId = cached;
+      // Helper: look up Wikipedia champion and cache/apply the result.
+      async function applyChampionFromWikipedia(tournamentId2, year, slug, name2, finalMatch2, createSynthetic) {
+        const yearStr = String(year);
+        const cachedMatchId = finalMatch2 ? finalMatch2.id : "Final-0";
+        const cached =
+          store.meta && store.meta.finalResults &&
+          store.meta.finalResults[tournamentId2] &&
+          store.meta.finalResults[tournamentId2][cachedMatchId];
+
+        if (cached) {
+          if (createSynthetic) {
+            parsed.rounds.push({
+              name: "Final",
+              matches: [{
+                id: "Final-0",
+                players: [
+                  { id: cached, name: cached, seed: "", rawScores: [], scores: [] },
+                  { id: "TBD", name: "TBD", seed: "", rawScores: [], scores: [] },
+                ],
+                winnerId: cached,
+              }],
+            });
+          } else if (finalMatch2 && !finalMatch2.winnerId) {
+            finalMatch2.winnerId = cached;
+          }
+          return;
+        }
+
+        // Fetch from Wikipedia.
+        const champion =
+          await fetchChampionFromWikipedia(yearStr, name2) ||
+          await fetchChampionFromWikipediaBySlug(yearStr, slug);
+        if (!champion) return;
+
+        // Find player ID: first try matching against draw players, then construct from name.
+        let playerId = findChampionPlayerId(champion, parsed.rounds);
+        if (!playerId) {
+          // For 0-round draws there are no players to match against — construct ID from name.
+          playerId = championNameToPlayerId(champion);
+        }
+        if (!playerId) return;
+
+        if (createSynthetic) {
+          parsed.rounds.push({
+            name: "Final",
+            matches: [{
+              id: "Final-0",
+              players: [
+                { id: playerId, name: playerId, seed: "", rawScores: [], scores: [] },
+                { id: "TBD", name: "TBD", seed: "", rawScores: [], scores: [] },
+              ],
+              winnerId: playerId,
+            }],
+          });
+        } else if (finalMatch2) {
+          finalMatch2.winnerId = playerId;
+        }
+
+        // Cache to avoid hitting Wikipedia on every request.
+        store.meta.finalResults = store.meta.finalResults || {};
+        store.meta.finalResults[tournamentId2] = store.meta.finalResults[tournamentId2] || {};
+        store.meta.finalResults[tournamentId2]["Final-0"] = playerId;
+        writeStore(store);
+      }
+
+      if (tournamentId) {
+        const yearMatch = tournamentId.match(/^(\d{4})-(.+)-\d+$/);
+        const year = yearMatch && yearMatch[1];
+        const slug = yearMatch && yearMatch[2];
+        const tournName = parsed.tournament && parsed.tournament.name;
+
+        if (year) {
+          if (parsed.rounds.length === 0) {
+            // No draw data at all (ATP Tour SPA shell) — still try to detect the Final winner
+            // so at least the Final round pick is scored correctly.
+            const cachedWinner =
+              store.meta && store.meta.finalResults &&
+              store.meta.finalResults[tournamentId] &&
+              store.meta.finalResults[tournamentId]["Final-0"];
+            if (cachedWinner) {
+              // Reconstruct a synthetic Final from the cached winner.
               parsed.rounds.push({
                 name: "Final",
                 matches: [{
                   id: "Final-0",
                   players: [
-                    { id: champId, name: champId, seed: "", rawScores: [], scores: [] },
+                    { id: cachedWinner, name: cachedWinner, seed: "", rawScores: [], scores: [] },
                     { id: "TBD", name: "TBD", seed: "", rawScores: [], scores: [] },
                   ],
-                  winnerId: champId,
+                  winnerId: cachedWinner,
                 }],
               });
+            } else {
+              await applyChampionFromWikipedia(tournamentId, year, slug, tournName, null, true);
             }
           } else {
-            const yearMatch = tournamentId.match(/^(\d{4})-(.+)-\d+$/);
-            const year = yearMatch && yearMatch[1];
-            const slug = yearMatch && yearMatch[2];
-            const name = parsed.tournament.name;
-            if (year) {
-              const champion =
-                await fetchChampionFromWikipedia(year, name) ||
-                await fetchChampionFromWikipediaBySlug(year, slug);
-              if (champion) {
-                const playerId = findChampionPlayerId(champion, parsed.rounds);
-                if (playerId) {
-                  if (finalMatch) {
-                    finalMatch.winnerId = playerId;
-                  } else {
-                    // Add synthetic Final round.
-                    parsed.rounds.push({
-                      name: "Final",
-                      matches: [{
-                        id: "Final-0",
-                        players: [
-                          { id: playerId, name: playerId, seed: "", rawScores: [], scores: [] },
-                          { id: "TBD", name: "TBD", seed: "", rawScores: [], scores: [] },
-                        ],
-                        winnerId: playerId,
-                      }],
-                    });
-                  }
-                  // Cache so we don't hit Wikipedia on every request.
-                  store.meta.finalResults = store.meta.finalResults || {};
-                  store.meta.finalResults[tournamentId] = store.meta.finalResults[tournamentId] || {};
-                  store.meta.finalResults[tournamentId]["Final-0"] = playerId;
-                  writeStore(store);
-                }
-              }
+            const lastRound = parsed.rounds[parsed.rounds.length - 1];
+            const isFinalRound = /^finals?$/i.test(lastRound.name);
+            const isSemiRound = /semi/i.test(lastRound.name);
+            const finalMatch = isFinalRound ? lastRound.matches[0] : null;
+            const needsWinner = (finalMatch && !finalMatch.winnerId) || isSemiRound;
+            if (needsWinner) {
+              // createSynthetic = true when last round is Semifinals (Final is missing entirely).
+              await applyChampionFromWikipedia(
+                tournamentId, year, slug, tournName, finalMatch, isSemiRound
+              );
             }
           }
         }
