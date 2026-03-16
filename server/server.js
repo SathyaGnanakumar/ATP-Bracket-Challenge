@@ -34,7 +34,7 @@ const currentFallbackTournaments = [
     endDate: "2026-03-29",
     drawUrl: "https://www.atptour.com/en/scores/current/miami/403/draws",
   },
-  // ── Completed 2026 (archive URLs so we never accidentally pull old-year data) ──
+  // ── Completed 2026 (archive URLs with verified 2026 event IDs) ──────────
   {
     slug: "acapulco",
     eventId: "807",
@@ -55,12 +55,12 @@ const currentFallbackTournaments = [
   },
   {
     slug: "dubai",
-    eventId: "330",
+    eventId: "495",
     name: "Dubai Duty Free Tennis Championships",
     location: "Dubai, UAE",
     startDate: "2026-02-23",
     endDate: "2026-03-01",
-    drawUrl: "https://www.atptour.com/en/scores/archive/dubai/330/2026/draws",
+    drawUrl: "https://www.atptour.com/en/scores/archive/dubai/495/2026/draws",
   },
   {
     slug: "dallas",
@@ -73,48 +73,48 @@ const currentFallbackTournaments = [
   },
   {
     slug: "rotterdam",
-    eventId: "40",
+    eventId: "407",
     name: "ABN AMRO Open",
     location: "Rotterdam, Netherlands",
     startDate: "2026-02-09",
     endDate: "2026-02-15",
-    drawUrl: "https://www.atptour.com/en/scores/archive/rotterdam/40/2026/draws",
+    drawUrl: "https://www.atptour.com/en/scores/archive/rotterdam/407/2026/draws",
   },
   {
     slug: "delray-beach",
-    eventId: "505",
+    eventId: "499",
     name: "Delray Beach Open",
     location: "Delray Beach, United States",
     startDate: "2026-02-09",
     endDate: "2026-02-15",
-    drawUrl: "https://www.atptour.com/en/scores/archive/delray-beach/505/2026/draws",
+    drawUrl: "https://www.atptour.com/en/scores/archive/delray-beach/499/2026/draws",
   },
   {
     slug: "buenos-aires",
-    eventId: "314",
-    name: "Argentina Open",
+    eventId: "506",
+    name: "IEB+ Argentina Open",
     location: "Buenos Aires, Argentina",
     startDate: "2026-02-09",
     endDate: "2026-02-15",
-    drawUrl: "https://www.atptour.com/en/scores/archive/buenos-aires/314/2026/draws",
+    drawUrl: "https://www.atptour.com/en/scores/archive/buenos-aires/506/2026/draws",
   },
   {
     slug: "rio-de-janeiro",
-    eventId: "316",
-    name: "Rio Open",
+    eventId: "6932",
+    name: "Rio Open presented by Claro",
     location: "Rio de Janeiro, Brazil",
     startDate: "2026-02-16",
     endDate: "2026-02-22",
-    drawUrl: "https://www.atptour.com/en/scores/archive/rio-de-janeiro/316/2026/draws",
+    drawUrl: "https://www.atptour.com/en/scores/archive/rio-de-janeiro/6932/2026/draws",
   },
   {
-    slug: "marseille",
-    eventId: "333",
-    name: "Open Sud de France",
+    slug: "montpellier",
+    eventId: "375",
+    name: "Open Occitanie",
     location: "Montpellier, France",
     startDate: "2026-02-02",
     endDate: "2026-02-08",
-    drawUrl: "https://www.atptour.com/en/scores/archive/marseille/333/2026/draws",
+    drawUrl: "https://www.atptour.com/en/scores/archive/montpellier/375/2026/draws",
   },
   {
     slug: "australian-open",
@@ -145,12 +145,12 @@ const currentFallbackTournaments = [
   },
   {
     slug: "adelaide",
-    eventId: "308",
+    eventId: "8998",
     name: "Adelaide International",
     location: "Adelaide, Australia",
-    startDate: "2026-01-05",
-    endDate: "2026-01-11",
-    drawUrl: "https://www.atptour.com/en/scores/archive/adelaide/308/2026/draws",
+    startDate: "2026-01-09",
+    endDate: "2026-01-17",
+    drawUrl: "https://www.atptour.com/en/scores/archive/adelaide/8998/2026/draws",
   },
 ];
 
@@ -1318,10 +1318,9 @@ const slugToWikiName = {
   "acapulco": "Abierto Mexicano Telcel",
   "rotterdam": "ABN AMRO Open",
   "doha": "Qatar ExxonMobil Open",
-  "buenos-aires": "Argentina Open",
-  "rio-de-janeiro": "Rio Open",
-  "marseille": "Open Sud de France",
-  "montpellier": "Open Sud de France",
+  "buenos-aires": "IEB+ Argentina Open",
+  "rio-de-janeiro": "Rio Open presented by Claro",
+  "montpellier": "Open Occitanie",
   "delray-beach": "Delray Beach Open",
   "metz": "Moselle Open",
   "st-petersburg": "St. Petersburg Open",
@@ -2118,6 +2117,23 @@ const server = http.createServer(async (req, res) => {
     try {
       const { parsed, url: sourceUrl } = await fetchWithFallback(target);
       parsed.tournament.sourceUrl = sourceUrl;
+
+      // Override tournament metadata with hardcoded values to prevent garbage from parsed HTML.
+      if (tournamentId) {
+        const idMatch = tournamentId.match(/^(\d{4})-(.+)-(\d+)$/);
+        if (idMatch) {
+          const [, , idSlug, idEventId] = idMatch;
+          const fallbackMeta = currentFallbackTournaments.find(
+            (t) => t.slug === idSlug && t.eventId === idEventId
+          );
+          if (fallbackMeta) {
+            if (fallbackMeta.name) parsed.tournament.name = fallbackMeta.name;
+            if (fallbackMeta.location) parsed.tournament.location = fallbackMeta.location;
+            if (fallbackMeta.startDate) parsed.tournament.startDate = fallbackMeta.startDate;
+            if (fallbackMeta.endDate) parsed.tournament.endDate = fallbackMeta.endDate;
+          }
+        }
+      }
 
       // Apply any cached/admin-recorded final results that the ATP Tour page didn't provide.
       const store = readStore();
