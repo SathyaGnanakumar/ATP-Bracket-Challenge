@@ -2039,6 +2039,54 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if (req.url?.startsWith("/api/season-standings")) {
+    const user = getAuthUser(req);
+    if (!user) return json(res, 401, { error: "Unauthorized" });
+    const url = new URL(req.url, "http://localhost");
+    const poolId = url.searchParams.get("pool");
+    if (!poolId) return json(res, 400, { error: "Missing pool" });
+    const store = readStore();
+    const memberIds = store.poolMembers[poolId] || [];
+    if (!memberIds.includes(user.id)) return json(res, 403, { error: "Not a pool member" });
+    const users = memberIds
+      .map((id) => store.users[id])
+      .filter(Boolean)
+      .map((u) => ({ id: u.id, name: u.name }));
+    const poolPicksData = store.picks?.[poolId] || {};
+    // Only include tournaments where at least one user has picks
+    const tournamentIds = Object.keys(poolPicksData).filter((tid) => {
+      const scope = poolPicksData[tid] || {};
+      return Object.values(scope).some((u) => u.picks && Object.keys(u.picks).length > 0);
+    });
+    const allPicks = {};
+    for (const tid of tournamentIds) {
+      const scope = poolPicksData[tid] || {};
+      allPicks[tid] = Object.fromEntries(
+        Object.entries(scope).map(([userId, value]) => [userId, value?.picks || {}]),
+      );
+    }
+    // Build tournament metadata from fallback list + id parse
+    const tournaments = tournamentIds.map((tid) => {
+      const idMatch = tid.match(/^(\d{4})-(.+)-(\d+)$/);
+      if (!idMatch) return { id: tid, name: tid, drawUrl: null };
+      const [, , idSlug, idEventId] = idMatch;
+      const meta = currentFallbackTournaments.find((t) => t.slug === idSlug && t.eventId === idEventId);
+      return {
+        id: tid,
+        slug: idSlug,
+        eventId: idEventId,
+        name: meta?.name || idSlug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        location: meta?.location || "",
+        startDate: meta?.startDate || "",
+        endDate: meta?.endDate || "",
+        drawUrl: meta?.drawUrl || `https://www.atptour.com/en/scores/archive/${idSlug}/${idEventId}/${tid.split("-")[0]}/draws`,
+      };
+    });
+    // Sort tournaments by startDate descending
+    tournaments.sort((a, b) => (b.startDate || "").localeCompare(a.startDate || ""));
+    return json(res, 200, { users, tournaments, picks: allPicks });
+  }
+
   if (req.url?.startsWith("/api/leaderboard")) {
     const user = getAuthUser(req);
     if (!user) return json(res, 401, { error: "Unauthorized" });

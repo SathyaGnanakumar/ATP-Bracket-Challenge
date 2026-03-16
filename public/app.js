@@ -171,6 +171,9 @@ const state = {
   activePoolId: "",
   isLocked: false,
   pendingInviteCode: "",
+  seasonData: null,
+  seasonLoading: false,
+  seasonDrawCache: {},
 };
 
 const DEVICE_ID_KEY = "deviceId";
@@ -196,6 +199,7 @@ const dom = {
   scoreRule: document.getElementById("score-rule"),
   leaderboard: document.getElementById("leaderboard"),
   standings: document.getElementById("standings"),
+  season: document.getElementById("season"),
   loginScreen: document.getElementById("login-screen"),
   loginName: document.getElementById("login-name"),
   loginPinRow: document.getElementById("login-pin-row"),
@@ -249,10 +253,14 @@ async function init() {
     render();
   });
 
-  dom.viewSelect.addEventListener("change", (event) => {
+  dom.viewSelect.addEventListener("change", async (event) => {
     state.view = event.target.value;
     syncUrlState();
-    render();
+    if (state.view === "season") {
+      await loadSeasonStandings();
+    } else {
+      render();
+    }
   });
 
   dom.loginSubmit.addEventListener("click", login);
@@ -310,12 +318,11 @@ async function initAuth() {
     setDefaultTournament();
     return;
   }
-  const sessionToken = sessionStorage.getItem("sessionToken");
-  const legacyToken = localStorage.getItem("sessionToken");
-  const token = sessionToken || legacyToken;
-  if (legacyToken && !sessionToken) {
-    sessionStorage.setItem("sessionToken", legacyToken);
-    localStorage.removeItem("sessionToken");
+  const token = localStorage.getItem("sessionToken") || sessionStorage.getItem("sessionToken");
+  // Migrate any sessionStorage-only token to localStorage for persistence.
+  if (!localStorage.getItem("sessionToken") && sessionStorage.getItem("sessionToken")) {
+    localStorage.setItem("sessionToken", sessionStorage.getItem("sessionToken"));
+    sessionStorage.removeItem("sessionToken");
   }
   if (token) {
     const me = await apiFetch("/api/me", { method: "GET" }, token);
@@ -356,7 +363,7 @@ async function login() {
     return;
   }
   const data = await response.json();
-  sessionStorage.setItem("sessionToken", data.token);
+  localStorage.setItem("sessionToken", data.token);
   if (data.deviceId) {
     localStorage.setItem(DEVICE_ID_KEY, data.deviceId);
   }
@@ -861,6 +868,11 @@ async function loadTournament() {
   state.selectedEntryId = null;
   state.standingsPage = 1;
   state.standingsQuery = "";
+  // If viewing season, stay on season view (it's pool-level, not tournament-level)
+  if (state.view === "season") {
+    loadSeasonStandings();
+    return;
+  }
 
   dom.meta.innerHTML = "<span>Loading draw from ATP Tour…</span>";
   dom.bracket.innerHTML = "";
@@ -993,14 +1005,19 @@ function render() {
 
   const showScores = state.view === "scores";
   const showStandings = state.view === "standings";
-  const showBracket = !showScores && !showStandings;
+  const showSeason = state.view === "season";
+  const showBracket = !showScores && !showStandings && !showSeason;
   dom.scores.classList.toggle("active", showScores);
   dom.standings.classList.toggle("active", showStandings);
+  if (dom.season) dom.season.classList.toggle("active", showSeason);
   dom.bracket.style.display = showBracket ? "grid" : "none";
   dom.scores.innerHTML = renderScores(completedRounds, results);
   dom.standings.innerHTML = renderStandings(completedRounds, results);
   dom.leaderboard.innerHTML = renderLeaderboard(completedRounds, results);
-  dom.leaderboard.style.display = showStandings ? "none" : "block";
+  dom.leaderboard.style.display = (showStandings || showSeason) ? "none" : "block";
+
+  // "Viewing [Name]'s bracket" banner
+  renderViewingBanner();
 
   dom.bracket.querySelectorAll(".player").forEach((node) => {
     node.addEventListener("click", () => {
@@ -1033,6 +1050,42 @@ function render() {
   if (showStandings) {
     bindStandingsEvents(completedRounds);
   }
+}
+
+function renderViewingBanner() {
+  let banner = document.getElementById("viewing-banner");
+  const isViewingOther = state.selectedEntryId && state.selectedEntryId !== state.session?.id;
+  if (!isViewingOther) {
+    if (banner) banner.remove();
+    return;
+  }
+  const entry = state.standings.find((row) => row.userId === state.selectedEntryId);
+  const name = entry?.name || "this player";
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "viewing-banner";
+    banner.className = "viewing-banner";
+    // Insert before the bracket section
+    const content = document.querySelector(".content");
+    if (content) content.parentNode.insertBefore(banner, content);
+  }
+  banner.innerHTML = `
+    <span>Viewing <strong>${escapeHtml(name)}</strong>'s bracket</span>
+    <button type="button" id="back-to-my-bracket" class="ghost">← Back to my bracket</button>
+  `;
+  document.getElementById("back-to-my-bracket")?.addEventListener("click", async () => {
+    state.selectedEntryId = null;
+    state.mode = "pre";
+    state.view = "bracket";
+    await restoreCurrentUserPicks();
+    [...dom.toggle.querySelectorAll("button")].forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.mode === "pre");
+      btn.classList.toggle("live", false);
+    });
+    dom.viewSelect.value = "bracket";
+    syncUrlState();
+    render();
+  });
 }
 
 function renderRound(round, roundIndex, rounds, results, layout) {
@@ -1209,6 +1262,114 @@ function hydrateStandings() {
   state.standings = rows.map((row, index) => ({ ...row, rank: index + 1 }));
 }
 
+async function loadSeasonStandings() {
+  if (!state.session || !state.activePoolId) return;
+  if (dom.season) dom.season.innerHTML = "<p>Loading season standings…</p>";
+  if (dom.season) dom.season.classList.add("active");
+  dom.bracket.style.display = "none";
+  dom.scores.classList.remove("active");
+  dom.standings.classList.remove("active");
+  dom.leaderboard.style.display = "none";
+
+  const seasonData = await apiFetch(`/api/season-standings?pool=${encodeURIComponent(state.activePoolId)}`);
+  if (!seasonData) {
+    if (dom.season) dom.season.innerHTML = "<p>Failed to load season standings.</p>";
+    return;
+  }
+
+  // Fetch draws for all tournaments in parallel (use cache)
+  const drawPromises = seasonData.tournaments.map(async (t) => {
+    if (state.seasonDrawCache[t.id]) return { id: t.id, draw: state.seasonDrawCache[t.id] };
+    if (!t.drawUrl) return { id: t.id, draw: null };
+    try {
+      const resp = await fetchWithTimeout(
+        `/api/draw?url=${encodeURIComponent(t.drawUrl)}&tournamentId=${encodeURIComponent(t.id)}`,
+        15000,
+      );
+      if (!resp.ok) return { id: t.id, draw: null };
+      const draw = await resp.json();
+      state.seasonDrawCache[t.id] = draw;
+      return { id: t.id, draw };
+    } catch {
+      return { id: t.id, draw: null };
+    }
+  });
+  const drawResults = await Promise.all(drawPromises);
+  const drawByTournament = Object.fromEntries(drawResults.map(({ id, draw }) => [id, draw]));
+
+  // Compute scores per user per tournament
+  const userScores = {};
+  for (const user of seasonData.users) {
+    userScores[user.id] = { name: user.name, total: 0, byTournament: {} };
+  }
+
+  for (const t of seasonData.tournaments) {
+    const draw = drawByTournament[t.id];
+    if (!draw || !draw.rounds?.length) continue;
+    const rounds = normalizeRounds(sortRounds(draw.rounds));
+    const results = getResultsMap(rounds);
+    const roundPoints = {};
+    let pts = 10;
+    rounds.forEach((r) => { roundPoints[r.name] = pts; pts *= 2; });
+
+    for (const user of seasonData.users) {
+      const picks = seasonData.picks[t.id]?.[user.id] || {};
+      let score = 0;
+      rounds.forEach((round) => {
+        round.matches.forEach((match) => {
+          const picked = picks?.[round.name]?.[match.id];
+          if (picked && results[match.id] === picked) score += roundPoints[round.name];
+        });
+      });
+      userScores[user.id].byTournament[t.id] = score;
+      userScores[user.id].total += score;
+    }
+  }
+
+  const rows = Object.values(userScores).sort((a, b) => b.total - a.total);
+  rows.forEach((row, i) => { row.rank = i + 1; });
+
+  state.seasonData = { users: seasonData.users, tournaments: seasonData.tournaments, rows };
+  if (dom.season) dom.season.innerHTML = renderSeasonStandings();
+}
+
+function renderSeasonStandings() {
+  const { users, tournaments, rows } = state.seasonData || {};
+  if (!rows || !rows.length) return "<h3>Season Standings</h3><p>No picks recorded yet.</p>";
+
+  const myRow = rows.find((r) => r.name === state.session?.name);
+  const tourCols = tournaments.map((t) => `<th>${escapeHtml(t.name.replace(/^[^A-Z]*/, "").split(" ").slice(0, 2).join(" ") || t.id)}</th>`).join("");
+
+  const bodyRows = rows.map((row) => {
+    const isMe = row.name === state.session?.name;
+    const tourCells = tournaments.map((t) => `<td>${row.byTournament?.[t.id] ?? 0}</td>`).join("");
+    return `<tr class="${isMe ? "standings-me" : ""}">
+      <td>${row.rank}</td>
+      <td>${escapeHtml(row.name)}${isMe ? " <span class='you-badge'>you</span>" : ""}</td>
+      ${tourCells}
+      <td><strong>${row.total}</strong></td>
+    </tr>`;
+  }).join("");
+
+  return `
+    <h3>Season Standings</h3>
+    <p class="standings-meta">${rows.length} entries · Your rank: #${myRow?.rank || "-"} · ${tournaments.length} tournament${tournaments.length !== 1 ? "s" : ""}</p>
+    <div class="standings-table-wrap">
+      <table class="standings-table season-table">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Player</th>
+            ${tourCols}
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
 function renderStandings(rounds, results) {
   if (!state.session || !state.standings.length) {
     return `
@@ -1245,6 +1406,7 @@ function renderStandings(rounds, results) {
             <th>Correct</th>
             <th>Accuracy</th>
             <th>Champion Pick</th>
+            ${state.isLocked ? "<th></th>" : ""}
           </tr>
         </thead>
         <tbody>
@@ -1253,11 +1415,12 @@ function renderStandings(rounds, results) {
               (row) => `
             <tr class="standings-row ${state.selectedEntryId === row.userId ? "selected" : ""}" data-entry-id="${row.userId}">
               <td>${row.rank}</td>
-              <td>${escapeHtml(row.name)}</td>
+              <td>${escapeHtml(row.name)}${row.userId === state.session?.id ? " <span class='you-badge'>you</span>" : ""}</td>
               <td>${row.score}</td>
               <td>${row.correct}</td>
               <td>${row.accuracy}%</td>
               <td>${escapeHtml(row.champion || "-")}</td>
+              ${state.isLocked ? `<td><button class="view-bracket-btn ghost" data-entry-id="${row.userId}">View bracket</button></td>` : ""}
             </tr>
           `,
             )
@@ -1303,9 +1466,10 @@ function bindStandingsEvents(rounds) {
     render();
   });
 
-  document.querySelectorAll(".standings-row").forEach((rowNode) => {
-    rowNode.addEventListener("click", () => {
-      const entryId = rowNode.dataset.entryId;
+  document.querySelectorAll(".view-bracket-btn").forEach((btn) => {
+    btn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const entryId = btn.dataset.entryId;
       if (!entryId) return;
       const entry = state.standings.find((row) => row.userId === entryId);
       if (!entry) return;
@@ -1313,9 +1477,9 @@ function bindStandingsEvents(rounds) {
       state.mode = "completed";
       state.view = "bracket";
       state.picks = entry.picks || {};
-      [...dom.toggle.querySelectorAll("button")].forEach((btn) => {
-        btn.classList.toggle("active", btn.dataset.mode === "completed");
-        btn.classList.toggle("live", false);
+      [...dom.toggle.querySelectorAll("button")].forEach((b) => {
+        b.classList.toggle("active", b.dataset.mode === "completed");
+        b.classList.toggle("live", false);
       });
       dom.viewSelect.value = "bracket";
       syncUrlState();
@@ -1329,7 +1493,7 @@ function applyUrlState() {
   const view = params.get("view");
   const mode = params.get("mode");
   const tournamentId = params.get("tournament");
-  if (view && ["bracket", "scores", "standings"].includes(view)) {
+  if (view && ["bracket", "scores", "standings", "season"].includes(view)) {
     state.view = view;
     dom.viewSelect.value = view;
   }
