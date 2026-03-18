@@ -31,7 +31,7 @@ const currentFallbackTournaments = [
     name: "Miami Open presented by Itau",
     location: "Miami Gardens, United States",
     startDate: "2026-03-18",
-    lockTime: "15:30:00Z", // 11:30 AM ET (EDT = UTC-4)
+    lockTime: "19:00:00Z", // 3:00 PM ET (EDT = UTC-4)
     endDate: "2026-03-29",
     drawUrl: "https://www.atptour.com/en/scores/current/miami/403/draws",
   },
