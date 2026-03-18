@@ -1,0 +1,8 @@
+# Live database — never commit, never deploy (contains all user picks & accounts)
+server/data.json
+
+# macOS
+.DS_Store
+
+# Node
+node_modules/
