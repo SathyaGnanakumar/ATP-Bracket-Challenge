@@ -158,6 +158,7 @@ const state = {
   view: "bracket",
   data: null,
   picks: {},
+  submitted: false,
   session: null,
   leaderboard: null,
   tournamentMeta: {},
@@ -899,6 +900,7 @@ async function loadTournament() {
         },
       );
       state.picks = picksData?.picks || {};
+      state.submitted = Boolean(picksData?.submitted);
       state.isLocked = Boolean(picksData?.locked);
       state.leaderboard = await apiFetch(
         `/api/leaderboard?tournament=${state.tournament.id}&pool=${state.activePoolId}`,
@@ -915,6 +917,7 @@ async function loadTournament() {
 
     updateMeta();
     syncUrlState();
+    renderBracketActions();
     render();
   } catch (error) {
     const isNotPublished = error.message.includes("not yet published");
@@ -934,6 +937,7 @@ async function restoreCurrentUserPicks() {
     },
   );
   state.picks = picksData?.picks || {};
+  state.submitted = Boolean(picksData?.submitted);
   state.isLocked = Boolean(picksData?.locked);
 }
 
@@ -1021,6 +1025,7 @@ function render() {
 
   // "Viewing [Name]'s bracket" banner
   renderViewingBanner();
+  renderBracketActions();
 
   dom.bracket.querySelectorAll(".player").forEach((node) => {
     node.addEventListener("click", () => {
@@ -1052,6 +1057,55 @@ function render() {
 
   if (showStandings) {
     bindStandingsEvents(completedRounds);
+  }
+}
+
+function renderBracketActions() {
+  const el = document.getElementById("bracket-actions");
+  if (!el) return;
+
+  const isOwnBracket =
+    state.session &&
+    state.data &&
+    state.mode === "pre" &&
+    (!state.selectedEntryId || state.selectedEntryId === state.session.id);
+
+  if (!isOwnBracket) {
+    el.innerHTML = "";
+    return;
+  }
+
+  const hasAnyPick = Object.values(state.picks).some(
+    (round) => Object.keys(round || {}).length > 0,
+  );
+
+  if (state.isLocked) {
+    el.innerHTML = `<div class="bracket-action-bar locked-notice">🔒 Bracket locked — picks are final.</div>`;
+    return;
+  }
+
+  if (state.submitted) {
+    el.innerHTML = `
+      <div class="bracket-action-bar submitted">
+        <span class="submit-status">✅ Bracket submitted!</span>
+        <button type="button" id="edit-bracket-btn" class="ghost">✏️ Edit picks</button>
+      </div>`;
+    document.getElementById("edit-bracket-btn")?.addEventListener("click", async () => {
+      state.submitted = false;
+      await savePicks({ submitted: false });
+    });
+  } else {
+    el.innerHTML = hasAnyPick
+      ? `<div class="bracket-action-bar">
+           <span class="submit-hint">Picks auto-save as you click. Hit Submit when you're done!</span>
+           <button type="button" id="submit-bracket-btn" class="btn-submit">Submit Bracket ✓</button>
+         </div>`
+      : `<div class="bracket-action-bar">
+           <span class="submit-hint">Click players in the bracket to make your picks.</span>
+         </div>`;
+    document.getElementById("submit-bracket-btn")?.addEventListener("click", async () => {
+      await savePicks({ submitted: true });
+    });
   }
 }
 
@@ -1585,8 +1639,9 @@ function renderLeaderboard(rounds, results) {
   `;
 }
 
-async function savePicks() {
+async function savePicks({ submitted } = {}) {
   if (!state.session || !state.activePoolId) return;
+  if (submitted !== undefined) state.submitted = submitted;
   const response = await fetch(
     `/api/picks?tournament=${encodeURIComponent(state.tournament.id)}&pool=${encodeURIComponent(state.activePoolId)}`,
     {
@@ -1595,12 +1650,13 @@ async function savePicks() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${state.session.token}`,
       },
-      body: JSON.stringify({ picks: state.picks }),
+      body: JSON.stringify({ picks: state.picks, submitted: state.submitted }),
     },
   );
   if (response.status === 423) {
     state.isLocked = true;
     updateMeta();
+    renderBracketActions();
     render();
     return;
   }
@@ -1613,6 +1669,7 @@ async function savePicks() {
     },
   );
   state.isLocked = Boolean(picksData?.locked);
+  state.submitted = Boolean(picksData?.submitted);
   state.leaderboard = await apiFetch(
     `/api/leaderboard?tournament=${state.tournament.id}&pool=${state.activePoolId}`,
     {
@@ -1624,6 +1681,7 @@ async function savePicks() {
   }
   hydrateStandings();
   updateMeta();
+  renderBracketActions();
   render();
 }
 

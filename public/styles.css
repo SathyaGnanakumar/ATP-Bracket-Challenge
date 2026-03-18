@@ -1336,3 +1336,66 @@ select:focus {
   /* Seed player in a bye match — auto-advances, no interaction */
   cursor: default;
 }
+
+/* ─── Bracket action bar (Submit / Edit) ─── */
+
+.bracket-actions {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 1rem 0;
+}
+
+.bracket-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  padding: 0.55rem 1rem;
+  font-size: 0.85rem;
+  color: var(--muted, #64748b);
+  width: 100%;
+  max-width: 480px;
+  justify-content: space-between;
+}
+
+.bracket-action-bar.submitted {
+  border-color: #22c55e;
+  background: #f0fdf4;
+}
+
+.bracket-action-bar.locked-notice {
+  border-color: #f97316;
+  background: #fff7ed;
+  color: #9a3412;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.submit-status {
+  color: #15803d;
+  font-weight: 600;
+}
+
+.submit-hint {
+  font-size: 0.8rem;
+  color: var(--muted, #64748b);
+}
+
+.btn-submit {
+  background: #f97316;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 0.4rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.btn-submit:hover {
+  background: #ea6c0a;
+}

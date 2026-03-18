@@ -30,7 +30,8 @@ const currentFallbackTournaments = [
     eventId: "403",
     name: "Miami Open presented by Itau",
     location: "Miami Gardens, United States",
-    startDate: "2026-03-19",
+    startDate: "2026-03-18",
+    lockTime: "15:30:00Z", // 11:30 AM ET (EDT = UTC-4)
     endDate: "2026-03-29",
     drawUrl: "https://www.atptour.com/en/scores/current/miami/403/draws",
   },
@@ -1648,12 +1649,19 @@ async function isTournamentLocked(tournamentId) {
   if (!tournament) return false;
 
   if (tournament.startDate) {
-    // Lock at 11:00 AM Eastern Time on the start date.
-    // March–November = EDT (UTC-4), so 11:00 AM ET = 15:00 UTC.
-    const startsAt = Date.parse(`${tournament.startDate}T15:00:00Z`);
+    // Lock at the configured lockTime (default 11:00 AM ET = 15:00 UTC).
+    // Tournaments can override with a per-event lockTime field (e.g. "15:30:00Z").
+    const lockTime = tournament.lockTime || "15:00:00Z";
+    const startsAt = Date.parse(`${tournament.startDate}T${lockTime}`);
     if (Number.isFinite(startsAt) && now >= startsAt) return true;
+    // startDate is configured — rely solely on the time-based lock above.
+    // Skip the winnerId fallback: early-round matches (e.g. R128 qualifiers)
+    // may have results before the configured lock time, and we don't want
+    // those to prevent users from saving their picks.
+    return false;
   }
 
+  // No startDate configured — fall back to detecting results in the draw.
   if (tournament.drawUrl) {
     try {
       const { parsed } = await fetchWithFallback(tournament.drawUrl);
@@ -2027,13 +2035,15 @@ const server = http.createServer(async (req, res) => {
     const locked = await isTournamentLocked(tournament);
     if (req.method === "GET") {
       const row = store.picks[poolId][tournament][user.id] || {};
-      return json(res, 200, { picks: row.picks || {}, locked });
+      return json(res, 200, { picks: row.picks || {}, submitted: Boolean(row.submitted), locked });
     }
     if (req.method === "POST") {
       if (locked) return json(res, 423, { error: "Draw is locked for this tournament" });
       const body = await readJson(req);
+      const existing = store.picks[poolId][tournament][user.id] || {};
       store.picks[poolId][tournament][user.id] = {
         picks: body.picks || {},
+        submitted: body.submitted !== undefined ? Boolean(body.submitted) : Boolean(existing.submitted),
         updatedAt: new Date().toISOString(),
       };
       writeStore(store);
