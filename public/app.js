@@ -1163,8 +1163,7 @@ function renderPlayer(player, matchId, roundName, picked, actualWinner, lockLive
   const isIncorrectCompleted =
     state.mode === "completed" && pickedThisPlayer && actualWinner && actualWinner !== player.id;
   const isIncorrect = Boolean(isIncorrectLive || isIncorrectCompleted);
-  // Disable interaction for bye matches — the winner is automatic, no picking allowed.
-  const isDisabled = state.mode === "completed" || lockLive || state.isLocked || byeMatch;
+  const isDisabled = state.mode === "completed" || lockLive || state.isLocked;
   const score =
     state.mode !== "pre" && player.scores?.length
       ? `<span class="player-score">${player.scores
