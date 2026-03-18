@@ -1648,7 +1648,9 @@ async function isTournamentLocked(tournamentId) {
   if (!tournament) return false;
 
   if (tournament.startDate) {
-    const startsAt = Date.parse(`${tournament.startDate}T00:00:00Z`);
+    // Lock at 11:00 AM Eastern Time on the start date.
+    // March–November = EDT (UTC-4), so 11:00 AM ET = 15:00 UTC.
+    const startsAt = Date.parse(`${tournament.startDate}T15:00:00Z`);
     if (Number.isFinite(startsAt) && now >= startsAt) return true;
   }
 

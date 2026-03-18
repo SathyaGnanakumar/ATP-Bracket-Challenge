@@ -1323,3 +1323,16 @@ select:focus {
 .season-table .standings-me td {
   background: rgba(249, 115, 22, 0.06);
 }
+
+/* ─── Bye match styling ─── */
+
+.player.bye {
+  opacity: 0.45;
+  font-style: italic;
+  cursor: default;
+}
+
+.bye-match .player:not(.bye) {
+  /* Seed player in a bye match — auto-advances, no interaction */
+  cursor: default;
+}

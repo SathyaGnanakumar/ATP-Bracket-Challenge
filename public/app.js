@@ -995,7 +995,10 @@ function render() {
   if (!state.data) return;
   const completedRounds = normalizeRounds(sortRounds(state.data.rounds));
   const preRounds = buildPreBracket(completedRounds);
-  const rounds = state.mode === "pre" ? preRounds : completedRounds;
+  // Always use preRounds for the visual bracket structure so connector lines
+  // are correctly drawn based on the bracket tree (pairs of R128 → R64, etc.).
+  // Live/Completed results are overlaid on top via getResultsMap(completedRounds).
+  const rounds = preRounds;
   const results = getResultsMap(completedRounds);
   const layout = buildLayout(rounds);
 
@@ -1105,10 +1108,14 @@ function renderRound(round, roundIndex, rounds, results, layout) {
 function renderMatch(match, roundName, roundIndex, rounds, results, layout) {
   const actualWinner = results[match.id];
   const picked = state.picks?.[roundName]?.[match.id];
+  // Always resolve via pre-bracket logic; live/completed results fill in actual players.
   const players = state.mode === "pre"
     ? resolvePrePlayers(match, roundIndex, rounds)
     : resolveCompletedPlayers(match, roundIndex, rounds, results);
   const top = layout.positions[match.id] ?? 0;
+
+  // Bye match: one opponent is "Bye" — no picking, no points.
+  const hasBye = players.some((p) => p?.id === "Bye");
 
   // Admin can set the Final winner when it's missing.
   const isFinal = roundName === "Final";
@@ -1121,7 +1128,7 @@ function renderMatch(match, roundName, roundIndex, rounds, results, layout) {
     : "";
 
   return `
-    <div class="match" style="top: ${top}px;">
+    <div class="match${hasBye ? " bye-match" : ""}" style="top: ${top}px;">
       ${players
         .map((player) =>
           renderPlayer(
@@ -1131,6 +1138,7 @@ function renderMatch(match, roundName, roundIndex, rounds, results, layout) {
             picked,
             actualWinner,
             state.mode === "live" && !!actualWinner,
+            hasBye,
           ),
         )
         .join("")}
@@ -1140,9 +1148,12 @@ function renderMatch(match, roundName, roundIndex, rounds, results, layout) {
   `;
 }
 
-function renderPlayer(player, matchId, roundName, picked, actualWinner, lockLive) {
+function renderPlayer(player, matchId, roundName, picked, actualWinner, lockLive, byeMatch = false) {
   if (!player) {
     return `<div class="player disabled"><span>TBD</span></div>`;
+  }
+  if (player.id === "Bye") {
+    return `<div class="player bye disabled"><span class="player-name"><span class="player-label">Bye</span></span></div>`;
   }
   const pickedThisPlayer = picked === player.id;
   const isPicked = state.mode !== "completed" && pickedThisPlayer;
@@ -1152,7 +1163,8 @@ function renderPlayer(player, matchId, roundName, picked, actualWinner, lockLive
   const isIncorrectCompleted =
     state.mode === "completed" && pickedThisPlayer && actualWinner && actualWinner !== player.id;
   const isIncorrect = Boolean(isIncorrectLive || isIncorrectCompleted);
-  const isDisabled = state.mode === "completed" || lockLive || state.isLocked;
+  // Disable interaction for bye matches — the winner is automatic, no picking allowed.
+  const isDisabled = state.mode === "completed" || lockLive || state.isLocked || byeMatch;
   const score =
     state.mode !== "pre" && player.scores?.length
       ? `<span class="player-score">${player.scores
@@ -1227,7 +1239,11 @@ function hydrateStandings() {
   const rounds = normalizeRounds(sortRounds(state.data.rounds));
   const results = getResultsMap(rounds);
   const roundPoints = getRoundPoints(rounds);
-  const totalMatches = rounds.reduce((sum, round) => sum + round.matches.length, 0);
+  // Exclude bye matches from scoring and accuracy — no real match was played.
+  const totalMatches = rounds.reduce(
+    (sum, round) => sum + round.matches.filter((m) => !isByeMatch(m)).length,
+    0,
+  );
 
   const rows = state.leaderboard.users.map((user) => {
     const picks = state.leaderboard.picks[user.id] || {};
@@ -1237,6 +1253,7 @@ function hydrateStandings() {
 
     rounds.forEach((round) => {
       round.matches.forEach((match) => {
+        if (isByeMatch(match)) return; // No points for bye matches
         const picked = picks?.[round.name]?.[match.id];
         if (round.name === "Final" && picked) champion = picked;
         if (picked && results[match.id] === picked) {
@@ -1533,6 +1550,7 @@ function renderLeaderboard(rounds, results) {
     const picks = state.leaderboard.picks[user.id] || {};
     const score = rounds.reduce((sum, round) => {
       const correct = round.matches.filter((match) => {
+        if (isByeMatch(match)) return false; // No points for bye matches
         const picked = picks?.[round.name]?.[match.id];
         return picked && results[match.id] === picked;
       }).length;
@@ -1782,33 +1800,56 @@ function findPlayerById(id) {
   return null;
 }
 
+function isByeMatch(match) {
+  return (match.players || []).some((p) => p?.id === "Bye");
+}
+
 function getResultsMap(rounds) {
   const results = {};
+
+  // Step 1: Explicit winnerId from the draw data.
   rounds.forEach((round) => {
     round.matches.forEach((match) => {
-      const winner = match.winnerId;
-      if (winner) results[match.id] = winner;
+      if (match.winnerId) results[match.id] = match.winnerId;
     });
   });
 
-  // Infer winners from next round: if a player appears in round N+1,
-  // they won their round N match.
-  for (let i = 0; i < rounds.length - 1; i++) {
-    const nextRoundPlayers = new Set(
-      rounds[i + 1].matches.flatMap((m) =>
-        (m.players || []).map((p) => p?.id).filter(Boolean)
-      )
-    );
-    rounds[i].matches.forEach((match) => {
+  // Step 2: Explicit bye inference — always applies regardless of match status.
+  // A player facing "Bye" automatically advances; no real match was played.
+  rounds.forEach((round) => {
+    round.matches.forEach((match) => {
       if (results[match.id]) return;
-      const winner = (match.players || []).find(
-        (p) => p?.id && p.id !== "Bye" && nextRoundPlayers.has(p.id)
-      );
-      if (winner) results[match.id] = winner.id;
+      const players = match.players || [];
+      const byeIdx = players.findIndex((p) => p?.id === "Bye");
+      if (byeIdx !== -1) {
+        const winner = players[1 - byeIdx];
+        if (winner?.id) results[match.id] = winner.id;
+      }
     });
+  });
+
+  // Step 3: Next-round inference — only when the tournament has actually started
+  // (at least one match has an explicit winnerId). This prevents pre-published
+  // draw data (e.g. Miami R64 matchups) from being misread as R128 results.
+  const tournamentStarted = rounds.some((r) => r.matches.some((m) => m.winnerId));
+  if (tournamentStarted) {
+    for (let i = 0; i < rounds.length - 1; i++) {
+      const nextRoundPlayers = new Set(
+        rounds[i + 1].matches.flatMap((m) =>
+          (m.players || []).map((p) => p?.id).filter(Boolean)
+        )
+      );
+      rounds[i].matches.forEach((match) => {
+        if (results[match.id]) return;
+        const winner = (match.players || []).find(
+          (p) => p?.id && p.id !== "Bye" && nextRoundPlayers.has(p.id)
+        );
+        if (winner) results[match.id] = winner.id;
+      });
+    }
   }
 
-  // For the Final (no next round to infer from), derive winner from set scores.
+  // Step 4: Derive winner from set scores (mainly for the Final).
   for (const round of rounds) {
     for (const match of round.matches) {
       if (results[match.id]) continue;
